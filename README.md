@@ -1,6 +1,6 @@
-# SmartBiz Backend
+# HCTA Backend
 
-> Node.js + TypeScript + Firebase + MongoDB backend for SmartBiz.ai
+> Node.js + TypeScript + Firebase + MongoDB backend for hcta.ai
 
 ## 🚀 Scripts
 
