@@ -1,25 +1,54 @@
-import mongoose from "mongoose";
+import mongoose, { Document, Schema } from "mongoose";
+import { StudentBase, StudentDocument } from "../types/student";
 
-const studentSchema = new mongoose.Schema(
+const studentSchema = new Schema<StudentDocument>(
   {
-    name: { type: String, index: true },
+    name: {
+      type: String,
+      required: true,
+      index: true,
+    },
     parentName: String,
     parentPhone: String,
     whatsappNumber: String,
     schoolName: String,
-    board: String,
-    classLevel: String,
+    board: {
+      type: String,
+      index: true,
+    },
+    classLevel: {
+      type: String,
+      index: true,
+    },
     batchId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Batch",
       index: true,
     },
-    weaknesses: [String],
-    rollNumber: String,
+    weaknesses: {
+      type: [String],
+      default: [],
+    },
+    rollNumber: {
+      type: String,
+      index: true,
+    },
     admissionDate: Date,
-    isDeleted: { type: Boolean, default: false },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   { timestamps: true }
 );
 
-export default mongoose.model("Student", studentSchema);
+// Compound indexes for efficient queries
+studentSchema.index({ batchId: 1, isDeleted: 1 });
+studentSchema.index({ board: 1, isDeleted: 1 });
+studentSchema.index({ classLevel: 1, isDeleted: 1 });
+studentSchema.index({ name: 1, isDeleted: 1 });
+studentSchema.index({ rollNumber: 1, isDeleted: 1 });
+studentSchema.index({ createdAt: -1, isDeleted: 1 });
+
+export const Student = mongoose.model<StudentDocument>("Student", studentSchema);

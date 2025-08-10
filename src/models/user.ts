@@ -1,22 +1,5 @@
 import mongoose, { Document, Schema } from "mongoose";
-
-export interface UserDocument extends Document {
-  uid: string;
-  name?: string;
-  email?: string;
-  mobile?: string;
-  profileImageUrl?: string;
-  role: { type: Schema.Types.ObjectId; ref: "Role" };
-  preferredLanguage?: string;
-  city?: string;
-  region?: string;
-  isActive?: boolean;
-  firebaseToken?: string;
-  registeredAt?: Date;
-  isDeleted?: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
+import { UserDocument } from "../types/user";
 
 const userSchema = new Schema<UserDocument>(
   {
@@ -26,7 +9,7 @@ const userSchema = new Schema<UserDocument>(
     mobile: String,
     profileImageUrl: String,
     role: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Role",
       required: true,
     },
