@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 dotenv.config();
 import { seedRoles } from "./seedRoles";
 import { seed } from "./seedRolesAndPermissions";
+import { seedTestData } from "./seedTestData";
 
 const runSeeder = async () => {
   try {
@@ -11,10 +12,15 @@ const runSeeder = async () => {
     await mongoose.connect(mongoUri);
     console.log("🚀 Connected to MongoDB");
 
+    // First seed roles and permissions
+    console.log("🔐 Seeding roles and permissions...");
     await seed();
-    // await seedRoles();
+    
+    // Then seed test data
+    console.log("📊 Seeding test data...");
+    await seedTestData();
 
-    console.log("🎉 Seeding completed successfully!");
+    console.log("🎉 All seeding completed successfully!");
     process.exit(0);
   } catch (error) {
     console.error("❌ Error during seeding:", error);

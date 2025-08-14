@@ -4,13 +4,13 @@ import { FeeBase, FeeDocument } from "../types/fee";
 const feeSchema = new Schema<FeeDocument>(
   {
     studentId: {
-      type: Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId as any,
       ref: "Student",
       required: true,
       index: true,
     },
     batchId: {
-      type: Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId as any,
       ref: "Batch",
       required: true,
       index: true,
@@ -44,11 +44,11 @@ const feeSchema = new Schema<FeeDocument>(
       default: false,
     },
     createdBy: {
-      type: Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId as any,
       ref: "User",
     },
     updatedBy: {
-      type: Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId as any,
       ref: "User",
     },
     isDeleted: {

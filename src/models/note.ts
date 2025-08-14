@@ -4,7 +4,7 @@ import { NoteBase, NoteDocument } from "../types/note";
 const noteSchema = new Schema<NoteDocument>(
   {
     batchId: {
-      type: Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId as any,
       ref: "Batch",
       required: true,
       index: true,
@@ -16,12 +16,12 @@ const noteSchema = new Schema<NoteDocument>(
     },
     fileURL: String,
     subjectId: {
-      type: Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId as any,
       ref: "Subject",
       index: true,
     },
     uploadedBy: {
-      type: Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId as any,
       ref: "User",
       required: true,
       index: true,
@@ -48,12 +48,12 @@ const noteSchema = new Schema<NoteDocument>(
       index: true,
     },
     createdBy: {
-      type: Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId as any,
       ref: "User",
       required: true,
     },
     updatedBy: {
-      type: Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId as any,
       ref: "User",
       required: true,
     },

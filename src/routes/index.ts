@@ -14,6 +14,16 @@ import authRoutes from "./auth";
 
 const router = express.Router();
 
+// Health check endpoint (no authentication required)
+router.get("/health", (req, res) => {
+  res.json({ 
+    status: "OK", 
+    message: "HCTA Backend Server is running",
+    timestamp: new Date().toISOString(),
+    version: "1.0.0"
+  });
+});
+
 router.use("/auth", authRoutes);
 router.use("/users", userRoutes);
 router.use("/batches", batchRoutes);

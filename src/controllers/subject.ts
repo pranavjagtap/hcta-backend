@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import { isValidObjectId } from "mongoose";
-import "../types/express";
 import {
   createSubject,
   getAllSubjects,

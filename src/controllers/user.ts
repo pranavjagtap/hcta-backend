@@ -1,11 +1,10 @@
 import { Request, Response } from "express";
 import { isValidObjectId } from "mongoose";
-import "../types/express";
-import { 
-  createUserSchema, 
-  updateUserSchema, 
+import {
+  createUserSchema,
+  updateUserSchema,
   createUserWithRoleSchema,
-  userQuerySchema 
+  userQuerySchema,
 } from "../validators/user";
 import {
   createUser,
@@ -30,22 +29,22 @@ import {
   UserListResponse,
   UserStatsResponse as UserStatsResponseType,
   ApiResponse,
-  DeleteUserResponse
+  DeleteUserResponse,
 } from "../interfaces/user.interface";
 
 export const create = async (req: Request, res: Response): Promise<void> => {
   try {
     // Check if creating with role name or role ID
     const isRoleNameProvided = req.body.roleName && !req.body.role;
-    
+
     if (isRoleNameProvided) {
       // Use role name schema
       const parsed = createUserWithRoleSchema.safeParse(req.body);
       if (!parsed.success) {
-        res.status(400).json({ 
+        res.status(400).json({
           success: false,
           error: "Validation failed",
-          details: parsed.error.errors 
+          details: parsed.error.errors,
         });
         return;
       }
@@ -79,10 +78,10 @@ export const create = async (req: Request, res: Response): Promise<void> => {
       // Use role ID schema
       const parsed = createUserSchema.safeParse(req.body);
       if (!parsed.success) {
-        res.status(400).json({ 
+        res.status(400).json({
           success: false,
           error: "Validation failed",
-          details: parsed.error.errors 
+          details: parsed.error.errors,
         });
         return;
       }
@@ -114,10 +113,10 @@ export const create = async (req: Request, res: Response): Promise<void> => {
       });
     }
   } catch (err: any) {
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: "Failed to create user", 
-      details: err.message || err 
+      error: "Failed to create user",
+      details: err.message || err,
     });
   }
 };
@@ -135,19 +134,26 @@ export const getAll = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const { page = 1, limit = 10, search, role, isActive, city } = queryValidation.data;
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      role,
+      isActive,
+      city,
+    } = queryValidation.data;
 
     // Build filters
     const filters: any = { isDeleted: false };
-    
+
     if (role) {
       filters.role = role;
     }
-    
+
     if (isActive !== undefined) {
       filters.isActive = isActive;
     }
-    
+
     if (city) {
       filters.city = city;
     }
@@ -165,10 +171,10 @@ export const getAll = async (req: Request, res: Response): Promise<void> => {
       data: result,
     });
   } catch (err: any) {
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: "Failed to fetch users", 
-      details: err.message || err 
+      error: "Failed to fetch users",
+      details: err.message || err,
     });
   }
 };
@@ -177,7 +183,7 @@ export const getById = async (req: Request, res: Response): Promise<void> => {
   try {
     // Handle profile route (no ID parameter)
     const id = req.params.id || req.user?._id;
-    
+
     if (!id) {
       res.status(400).json({ error: "User ID is required" });
       return;
@@ -205,10 +211,10 @@ export const getById = async (req: Request, res: Response): Promise<void> => {
       data: user,
     });
   } catch (err) {
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: "Failed to fetch user", 
-      details: err 
+      error: "Failed to fetch user",
+      details: err,
     });
   }
 };
@@ -217,7 +223,7 @@ export const update = async (req: Request, res: Response): Promise<void> => {
   try {
     // Handle profile route (no ID parameter)
     const id = req.params.id || req.user?._id;
-    
+
     if (!id) {
       res.status(400).json({ error: "User ID is required" });
       return;
@@ -236,10 +242,10 @@ export const update = async (req: Request, res: Response): Promise<void> => {
 
     const parsed = updateUserSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ 
+      res.status(400).json({
         success: false,
         error: "Validation failed",
-        details: parsed.error.errors 
+        details: parsed.error.errors,
       });
       return;
     }
@@ -275,10 +281,10 @@ export const update = async (req: Request, res: Response): Promise<void> => {
       message: "User updated successfully",
     });
   } catch (err) {
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: "Failed to update user", 
-      details: err 
+      error: "Failed to update user",
+      details: err,
     });
   }
 };
@@ -290,9 +296,9 @@ export const softDelete = async (
   try {
     const id = req.params.id;
     if (!isValidObjectId(id)) {
-      res.status(400).json({ 
+      res.status(400).json({
         success: false,
-        error: "Invalid ID" 
+        error: "Invalid ID",
       });
       return;
     }
@@ -313,19 +319,22 @@ export const softDelete = async (
       message: "User deleted successfully",
     });
   } catch (err) {
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: "Failed to delete user", 
-      details: err 
+      error: "Failed to delete user",
+      details: err,
     });
   }
 };
 
 // Get user statistics (for admin dashboard)
-export const getUserStats = async (req: Request, res: Response): Promise<void> => {
+export const getUserStats = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const stats = await getStatsFromService();
-    
+
     res.status(200).json({
       success: true,
       data: stats,
@@ -340,7 +349,10 @@ export const getUserStats = async (req: Request, res: Response): Promise<void> =
 };
 
 // Change user password (admin only)
-export const changeUserPassword = async (req: Request, res: Response): Promise<void> => {
+export const changeUserPassword = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const { id } = req.params;
     const { newPassword } = req.body;
@@ -365,7 +377,8 @@ export const changeUserPassword = async (req: Request, res: Response): Promise<v
     // For now, return a placeholder response
     res.status(200).json({
       success: true,
-      message: "Password change functionality to be implemented in user service",
+      message:
+        "Password change functionality to be implemented in user service",
     });
   } catch (err) {
     res.status(500).json({
@@ -377,7 +390,10 @@ export const changeUserPassword = async (req: Request, res: Response): Promise<v
 };
 
 // Toggle user active status
-export const toggleUserStatus = async (req: Request, res: Response): Promise<void> => {
+export const toggleUserStatus = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const { id } = req.params;
 
@@ -421,7 +437,9 @@ export const toggleUserStatus = async (req: Request, res: Response): Promise<voi
     res.status(200).json({
       success: true,
       data: updatedUser,
-      message: `User ${!updatedUser.isActive ? "deactivated" : "activated"} successfully`,
+      message: `User ${
+        !updatedUser.isActive ? "deactivated" : "activated"
+      } successfully`,
     });
   } catch (err) {
     res.status(500).json({

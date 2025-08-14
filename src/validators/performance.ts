@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const createPerformanceSchema = z.object({
+const basePerformanceSchema = z.object({
   studentId: z.string().min(1, "Student ID is required"),
   topic: z.string().min(1, "Topic is required").max(200, "Topic must be less than 200 characters"),
   subjectId: z.string().min(1, "Subject ID is required"),
@@ -9,12 +9,14 @@ export const createPerformanceSchema = z.object({
   remarks: z.string().max(500, "Remarks must be less than 500 characters").optional(),
   assessmentType: z.enum(["test", "oral", "assignment", "project"]),
   date: z.union([z.string().datetime(), z.date()]),
-}).refine((data) => data.score <= data.maxScore, {
+});
+
+export const createPerformanceSchema = basePerformanceSchema.refine((data) => data.score <= data.maxScore, {
   message: "Score cannot exceed max score",
   path: ["score"],
 });
 
-export const updatePerformanceSchema = createPerformanceSchema.partial();
+export const updatePerformanceSchema = basePerformanceSchema.partial();
 
 export const performanceQuerySchema = z.object({
   page: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().min(1).max(1000)).optional(),

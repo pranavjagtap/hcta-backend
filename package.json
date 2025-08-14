@@ -8,7 +8,9 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "jest",
-    "seed": "ts-node src/scripts/seed.ts"
+    "seed": "ts-node src/scripts/seed.ts",
+    "seed:test": "ts-node src/scripts/seedTestDataOnly.ts",
+    "seed:roles": "ts-node src/scripts/seedRolesAndPermissions.ts"
   },
   "keywords": [],
   "author": "",

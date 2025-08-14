@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import { isValidObjectId } from "mongoose";
-import "../types/express";
 import { Assignment } from "../models/assignment";
 import { Batch } from "../models/batch";
 import { Subject } from "../models/subject";
@@ -254,7 +253,7 @@ export const getAssignmentById = async (req: Request, res: Response): Promise<vo
     const submittedStudentIds = submissions.map(s => (s.studentId as any)._id.toString());
     const allStudentIds = (assignment.batchId as any).studentIds;
     const notSubmittedStudentIds = allStudentIds.filter(
-      studentId => !submittedStudentIds.includes(studentId.toString())
+      (studentId: any) => !submittedStudentIds.includes(studentId.toString())
     );
 
     // Populate not submitted students
