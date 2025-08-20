@@ -1,996 +1,1040 @@
-import { Performance } from "../models/performance";
-import { Student } from "../models/student";
-import { Subject } from "../models/subject";
-import { Batch } from "../models/batch";
-import { FilterQuery } from "mongoose";
+import mongoose from 'mongoose';
 import { 
-  PerformanceBase, 
-  PerformanceUpdate, 
-  PerformanceStats, 
-  StudentPerformanceSummary, 
-  BatchPerformanceSummary, 
-  PerformanceComparison, 
-  PerformanceHeatmapData,
-  PerformanceQuery
-} from "../types/performance";
+  Performance, 
+  Attendance, 
+  PerformanceAnalytics, 
+  PerformanceReport, 
+  PerformanceAlert,
+  IPerformance,
+  IAttendance,
+  IPerformanceAnalytics,
+  IPerformanceReport,
+  IPerformanceAlert
+} from '../models/performance';
+import { Student } from '../models/student';
+import { User } from '../models/user';
+import { AIService } from './aiService';
+import { S3Service } from './s3Service';
+import { AppError } from '../utils/appError';
+import { logger } from '../utils/logger';
+import {
+  PerformanceCreate,
+  PerformanceUpdate,
+  PerformanceResponse,
+  PerformanceQuery,
+  PerformanceListResponse,
+  AttendanceCreate,
+  AttendanceUpdate,
+  AttendanceResponse,
+  AttendanceQuery,
+  AttendanceListResponse,
+  PerformanceAnalyticsCreate,
+  PerformanceAnalyticsUpdate,
+  PerformanceAnalyticsResponse,
+  PerformanceAnalyticsQuery,
+  PerformanceAnalyticsListResponse,
+  PerformanceReportCreate,
+  PerformanceReportUpdate,
+  PerformanceReportResponse,
+  PerformanceReportQuery,
+  PerformanceReportListResponse,
+  PerformanceAlertCreate,
+  PerformanceAlertUpdate,
+  PerformanceAlertResponse,
+  PerformanceAlertQuery,
+  PerformanceAlertListResponse,
+  RecordPerformanceRequest,
+  RecordAttendanceRequest,
+  BulkAttendanceRequest,
+  GenerateReportRequest,
+  SendAlertRequest,
+  PerformanceStats,
+  AttendanceStats,
+  AnalyticsStats,
+  AlertStats,
+  PerformanceTrends,
+  AIPerformancePredictionRequest,
+  AIPerformanceRecommendationRequest,
+  AIPerformanceTrendsRequest,
+  AIReportGenerationRequest
+} from '../types/performance';
 
-// Create a new performance record
-export const createPerformance = async (data: PerformanceBase) => {
-  const performance = new Performance(data);
-  const savedPerformance = await performance.save();
-  
-  return await savedPerformance.populate([
-    { 
-      path: "studentId", 
-      select: "name rollNumber",
-      populate: { path: "batchId", select: "name" }
-    },
-    { path: "subjectId", select: "name board classLevel" },
-  ]);
-};
+export class PerformanceService {
+  /**
+   * Performance Records Management
+   */
+  static async createPerformance(data: PerformanceCreate): Promise<PerformanceResponse> {
+    try {
+      // Calculate percentage
+      const percentage = (data.score / data.maxScore) * 100;
+      
+      const performance = new Performance({
+        ...data,
+        percentage
+      });
 
-// Get all performance records with pagination, search, and population
-export const getAllPerformances = async (
-  filters: FilterQuery<typeof Performance> = {},
-  options: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    populate?: boolean;
-  } = {}
-) => {
-  const { page = 1, limit = 10, search, populate = true } = options;
-
-  // Ensure isDeleted filter is applied
-  filters.isDeleted = false;
-
-  // Build search filter
-  if (search) {
-    filters.$or = [
-      { topic: { $regex: search, $options: "i" } },
-      { remarks: { $regex: search, $options: "i" } },
-    ];
-  }
-
-  const query = Performance.find(filters);
-
-  if (populate) {
-    query.populate([
-      { 
-        path: "studentId", 
-        select: "name rollNumber",
-        populate: { path: "batchId", select: "name" }
-      },
-      { path: "subjectId", select: "name board classLevel" },
-    ]);
-  }
-
-  // Apply pagination
-  const skip = (page - 1) * limit;
-  const performances = await query
-    .skip(skip)
-    .limit(limit)
-    .sort({ date: -1, createdAt: -1 });
-
-  // Get total count for pagination
-  const total = await Performance.countDocuments(filters);
-
-  return {
-    performances,
-    pagination: {
-      current: page,
-      pages: Math.ceil(total / limit),
-      total,
-      hasNext: page < Math.ceil(total / limit),
-      hasPrev: page > 1,
-    },
-  };
-};
-
-// Get performances for a specific tutor (through students in batches)
-export const getTutorPerformances = async (
-  tutorId: string,
-  filters: FilterQuery<typeof Performance> = {},
-  options: {
-    page?: number;
-    limit?: number;
-    search?: string;
-  } = {}
-) => {
-  // Get all batches by this tutor
-  const tutorBatches = await Batch.find({
-    tutorId,
-    isDeleted: false,
-  }).select("_id");
-
-  const batchIds = tutorBatches.map(batch => batch._id);
-  
-  // Get all students in these batches
-  const students = await Student.find({
-    batchId: { $in: batchIds },
-    isDeleted: false,
-  }).select("_id");
-
-  const studentIds = students.map(student => student._id);
-  
-  const tutorFilters = { 
-    ...filters, 
-    studentId: { $in: studentIds }, 
-    isDeleted: false 
-  };
-  
-  return await getAllPerformances(tutorFilters, options);
-};
-
-// Get performance by ID
-export const getPerformanceById = async (id: string, tutorId?: string) => {
-  const filters: any = { _id: id, isDeleted: false };
-  
-  if (tutorId) {
-    // Get all batches by this tutor
-    const tutorBatches = await Batch.find({
-      tutorId,
-      isDeleted: false,
-    }).select("_id");
-
-    const batchIds = tutorBatches.map(batch => batch._id);
-    
-    // Get all students in these batches
-    const students = await Student.find({
-      batchId: { $in: batchIds },
-      isDeleted: false,
-    }).select("_id");
-
-    const studentIds = students.map(student => student._id);
-    filters.studentId = { $in: studentIds };
-  }
-
-  const performance = await Performance.findOne(filters).populate([
-    { 
-      path: "studentId", 
-      select: "name rollNumber",
-      populate: { path: "batchId", select: "name" }
-    },
-    { path: "subjectId", select: "name board classLevel" },
-  ]);
-
-  return performance;
-};
-
-// Update performance
-export const updatePerformance = async (id: string, data: PerformanceUpdate, tutorId?: string) => {
-  const filters: any = { _id: id, isDeleted: false };
-  
-  if (tutorId) {
-    // Get all batches by this tutor
-    const tutorBatches = await Batch.find({
-      tutorId,
-      isDeleted: false,
-    }).select("_id");
-
-    const batchIds = tutorBatches.map(batch => batch._id);
-    
-    // Get all students in these batches
-    const students = await Student.find({
-      batchId: { $in: batchIds },
-      isDeleted: false,
-    }).select("_id");
-
-    const studentIds = students.map(student => student._id);
-    filters.studentId = { $in: studentIds };
-  }
-
-  const performance = await Performance.findOneAndUpdate(
-    filters,
-    { ...data, updatedAt: new Date() },
-    { new: true }
-  ).populate([
-    { 
-      path: "studentId", 
-      select: "name rollNumber",
-      populate: { path: "batchId", select: "name" }
-    },
-    { path: "subjectId", select: "name board classLevel" },
-  ]);
-
-  return performance;
-};
-
-// Soft delete performance
-export const softDeletePerformance = async (id: string, tutorId?: string) => {
-  const filters: any = { _id: id, isDeleted: false };
-  
-  if (tutorId) {
-    // Get all batches by this tutor
-    const tutorBatches = await Batch.find({
-      tutorId,
-      isDeleted: false,
-    }).select("_id");
-
-    const batchIds = tutorBatches.map(batch => batch._id);
-    
-    // Get all students in these batches
-    const students = await Student.find({
-      batchId: { $in: batchIds },
-      isDeleted: false,
-    }).select("_id");
-
-    const studentIds = students.map(student => student._id);
-    filters.studentId = { $in: studentIds };
-  }
-
-  const performance = await Performance.findOneAndUpdate(
-    filters,
-    { isDeleted: true, updatedAt: new Date() },
-    { new: true }
-  );
-
-  return performance;
-};
-
-// Bulk create performance records
-export const bulkCreatePerformances = async (performances: PerformanceBase[]) => {
-  const performanceDocs = performances.map(data => new Performance(data));
-  const savedPerformances = await Performance.insertMany(performanceDocs);
-  
-  // Populate the saved performances
-  const populatedPerformances = await Performance.populate(savedPerformances, [
-    { 
-      path: "studentId", 
-      select: "name rollNumber",
-      populate: { path: "batchId", select: "name" }
-    },
-    { path: "subjectId", select: "name board classLevel" },
-  ]);
-
-  return populatedPerformances;
-};
-
-// Get performances for a specific student
-export const getStudentPerformances = async (studentId: string, filters: any = {}) => {
-  const studentFilters = { 
-    studentId, 
-    isDeleted: false,
-    ...filters
-  };
-
-  const performances = await Performance.find(studentFilters)
-    .populate([
-      { path: "subjectId", select: "name board classLevel" },
-    ])
-    .sort({ date: -1 });
-
-  return performances;
-};
-
-// Get student performance summary
-export const getStudentPerformanceSummary = async (studentId: string, startDate?: Date, endDate?: Date): Promise<StudentPerformanceSummary | null> => {
-  const student = await Student.findById(studentId).populate("batchId", "name");
-  if (!student) {
-    return null;
-  }
-
-  const filters: any = { studentId, isDeleted: false };
-  if (startDate || endDate) {
-    filters.date = {};
-    if (startDate) filters.date.$gte = startDate;
-    if (endDate) filters.date.$lte = endDate;
-  }
-
-  // Get performance statistics
-  const stats = await Performance.aggregate([
-    { $match: filters },
-    {
-      $group: {
-        _id: null,
-        totalAssessments: { $sum: 1 },
-        averageScore: { $avg: { $divide: ["$score", "$maxScore"] } },
-        highestScore: { $max: { $divide: ["$score", "$maxScore"] } },
-        lowestScore: { $min: { $divide: ["$score", "$maxScore"] } },
-        passCount: { $sum: { $cond: [{ $gte: [{ $divide: ["$score", "$maxScore"] }, 0.4] }, 1, 0] } }
-      }
+      await performance.save();
+      
+      // Update analytics after creating performance record
+      await this.updateStudentAnalytics(data.studentId, data.academicYear);
+      
+      return await this.formatPerformanceResponse(performance);
+    } catch (error) {
+      logger.error('Error creating performance record:', error);
+      throw new AppError('Failed to create performance record', 500);
     }
-  ]);
-
-  const performanceBySubject = await Performance.aggregate([
-    { $match: filters },
-    {
-      $group: {
-        _id: "$subjectId",
-        count: { $sum: 1 },
-        averageScore: { $avg: { $divide: ["$score", "$maxScore"] } },
-        highestScore: { $max: { $divide: ["$score", "$maxScore"] } }
-      }
-    },
-    {
-      $lookup: {
-        from: "subjects",
-        localField: "_id",
-        foreignField: "_id",
-        as: "subject"
-      }
-    },
-    { $unwind: "$subject" },
-    {
-      $project: {
-        subjectId: "$_id",
-        subjectName: "$subject.name",
-        count: 1,
-        averageScore: 1,
-        highestScore: 1
-      }
-    },
-    { $sort: { averageScore: -1 } }
-  ]);
-
-  const performanceByType = await Performance.aggregate([
-    { $match: filters },
-    {
-      $group: {
-        _id: "$assessmentType",
-        count: { $sum: 1 },
-        averageScore: { $avg: { $divide: ["$score", "$maxScore"] } }
-      }
-    },
-    { $sort: { count: -1 } }
-  ]);
-
-  // Get recent assessments
-  const recentAssessments = await Performance.find(filters)
-    .populate("subjectId", "name")
-    .sort({ date: -1 })
-    .limit(10);
-
-  const recentAssessmentsData = recentAssessments.map(perf => ({
-    _id: perf._id.toString(),
-    topic: perf.topic,
-    subjectName: (perf.subjectId as any).name,
-    score: perf.score,
-    maxScore: perf.maxScore,
-    assessmentType: perf.assessmentType,
-    date: perf.date.toISOString(),
-    percentage: Math.round((perf.score / perf.maxScore) * 100),
-  }));
-
-  // Calculate improvement areas (subjects with lowest scores)
-  const improvementAreas = performanceBySubject
-    .filter(subject => subject.averageScore < 0.6)
-    .map(subject => ({
-      subjectId: subject.subjectId,
-      subjectName: subject.subjectName,
-      averageScore: Math.round(subject.averageScore * 100),
-      recommendation: subject.averageScore < 0.4 ? "Needs immediate attention" : "Requires improvement",
-    }));
-
-  const totalAssessments = stats[0]?.totalAssessments || 0;
-  const averageScore = stats[0]?.averageScore || 0;
-  const passRate = totalAssessments > 0 ? (stats[0]?.passCount / totalAssessments) * 100 : 0;
-
-  return {
-    studentId,
-    studentName: student.name,
-    totalAssessments,
-    averageScore: Math.round(averageScore * 100),
-    highestScore: Math.round((stats[0]?.highestScore || 0) * 100),
-    lowestScore: Math.round((stats[0]?.lowestScore || 0) * 100),
-    passRate: Math.round(passRate),
-    performanceBySubject: performanceBySubject.map(subject => ({
-      ...subject,
-      averageScore: Math.round(subject.averageScore * 100),
-      highestScore: Math.round(subject.highestScore * 100),
-    })),
-    performanceByType: performanceByType.map(type => ({
-      ...type,
-      averageScore: Math.round(type.averageScore * 100),
-    })),
-    recentAssessments: recentAssessmentsData,
-    improvementAreas,
-  };
-};
-
-// Get batch performance summary
-export const getBatchPerformanceSummary = async (batchId: string, startDate?: Date, endDate?: Date): Promise<BatchPerformanceSummary | null> => {
-  const batch = await Batch.findById(batchId);
-  if (!batch) {
-    return null;
   }
 
-  // Get all students in the batch
-  const students = await Student.find({ batchId, isDeleted: false }).select("_id name");
-  const studentIds = students.map(student => student._id);
-
-  const filters: any = { 
-    studentId: { $in: studentIds }, 
-    isDeleted: false 
-  };
-  if (startDate || endDate) {
-    filters.date = {};
-    if (startDate) filters.date.$gte = startDate;
-    if (endDate) filters.date.$lte = endDate;
-  }
-
-  // Get performance statistics
-  const stats = await Performance.aggregate([
-    { $match: filters },
-    {
-      $group: {
-        _id: null,
-        totalAssessments: { $sum: 1 },
-        averageScore: { $avg: { $divide: ["$score", "$maxScore"] } },
-        highestScore: { $max: { $divide: ["$score", "$maxScore"] } },
-        lowestScore: { $min: { $divide: ["$score", "$maxScore"] } },
-        passCount: { $sum: { $cond: [{ $gte: [{ $divide: ["$score", "$maxScore"] }, 0.4] }, 1, 0] } }
-      }
-    }
-  ]);
-
-  // Get top performers
-  const topPerformers = await Performance.aggregate([
-    { $match: filters },
-    {
-      $group: {
-        _id: "$studentId",
-        averageScore: { $avg: { $divide: ["$score", "$maxScore"] } },
-        totalAssessments: { $sum: 1 }
-      }
-    },
-    {
-      $lookup: {
-        from: "students",
-        localField: "_id",
-        foreignField: "_id",
-        as: "student"
-      }
-    },
-    { $unwind: "$student" },
-    {
-      $project: {
-        studentId: "$_id",
-        studentName: "$student.name",
-        averageScore: 1,
-        totalAssessments: 1
-      }
-    },
-    { $sort: { averageScore: -1 } },
-    { $limit: 5 }
-  ]);
-
-  const performanceBySubject = await Performance.aggregate([
-    { $match: filters },
-    {
-      $group: {
-        _id: "$subjectId",
-        averageScore: { $avg: { $divide: ["$score", "$maxScore"] } },
-        totalAssessments: { $sum: 1 },
-        passCount: { $sum: { $cond: [{ $gte: [{ $divide: ["$score", "$maxScore"] }, 0.4] }, 1, 0] } }
-      }
-    },
-    {
-      $lookup: {
-        from: "subjects",
-        localField: "_id",
-        foreignField: "_id",
-        as: "subject"
-      }
-    },
-    { $unwind: "$subject" },
-    {
-      $project: {
-        subjectId: "$_id",
-        subjectName: "$subject.name",
-        averageScore: 1,
-        totalAssessments: 1,
-        passRate: { $multiply: [{ $divide: ["$passCount", "$totalAssessments"] }, 100] }
-      }
-    },
-    { $sort: { averageScore: -1 } }
-  ]);
-
-  const performanceByType = await Performance.aggregate([
-    { $match: filters },
-    {
-      $group: {
-        _id: "$assessmentType",
-        count: { $sum: 1 },
-        averageScore: { $avg: { $divide: ["$score", "$maxScore"] } }
-      }
-    },
-    { $sort: { count: -1 } }
-  ]);
-
-  // Get recent trends (last 30 days)
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const recentTrends = await Performance.aggregate([
-    { 
-      $match: { 
-        ...filters, 
-        date: { $gte: thirtyDaysAgo } 
-      } 
-    },
-    {
-      $group: {
-        _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
-        averageScore: { $avg: { $divide: ["$score", "$maxScore"] } },
-        assessmentCount: { $sum: 1 }
-      }
-    },
-    { $sort: { _id: 1 } }
-  ]);
-
-  const totalAssessments = stats[0]?.totalAssessments || 0;
-  const averageScore = stats[0]?.averageScore || 0;
-  const passRate = totalAssessments > 0 ? (stats[0]?.passCount / totalAssessments) * 100 : 0;
-
-  return {
-    batchId,
-    batchName: batch.name,
-    totalStudents: students.length,
-    totalAssessments,
-    averageScore: Math.round(averageScore * 100),
-    highestScore: Math.round((stats[0]?.highestScore || 0) * 100),
-    lowestScore: Math.round((stats[0]?.lowestScore || 0) * 100),
-    passRate: Math.round(passRate),
-    topPerformers: topPerformers.map(performer => ({
-      ...performer,
-      averageScore: Math.round(performer.averageScore * 100),
-    })),
-    performanceBySubject: performanceBySubject.map(subject => ({
-      ...subject,
-      averageScore: Math.round(subject.averageScore * 100),
-      passRate: Math.round(subject.passRate),
-    })),
-    performanceByType: performanceByType.map(type => ({
-      ...type,
-      averageScore: Math.round(type.averageScore * 100),
-    })),
-    recentTrends: recentTrends.map(trend => ({
-      date: trend._id,
-      averageScore: Math.round(trend.averageScore * 100),
-      assessmentCount: trend.assessmentCount,
-    })),
-  };
-};
-
-// Get performance comparison between two periods
-export const getPerformanceComparison = async (
-  studentId: string,
-  currentStartDate: Date,
-  currentEndDate: Date,
-  previousStartDate: Date,
-  previousEndDate: Date
-): Promise<PerformanceComparison | null> => {
-  const student = await Student.findById(studentId);
-  if (!student) {
-    return null;
-  }
-
-  // Get current period performance
-  const currentStats = await Performance.aggregate([
-    {
-      $match: {
+  static async getPerformances(query: PerformanceQuery): Promise<PerformanceListResponse> {
+    try {
+      const {
         studentId,
-        date: { $gte: currentStartDate, $lte: currentEndDate },
-        isDeleted: false
-      }
-    },
-    {
-      $group: {
-        _id: null,
-        averageScore: { $avg: { $divide: ["$score", "$maxScore"] } },
-        totalAssessments: { $sum: 1 }
-      }
-    }
-  ]);
+        academicYear,
+        semester,
+        subject,
+        assessmentType,
+        startDate,
+        endDate,
+        page = 1,
+        limit = 10,
+        sortBy = 'assessmentDate',
+        sortOrder = 'desc'
+      } = query;
 
-  // Get previous period performance
-  const previousStats = await Performance.aggregate([
-    {
-      $match: {
-        studentId,
-        date: { $gte: previousStartDate, $lte: previousEndDate },
-        isDeleted: false
-      }
-    },
-    {
-      $group: {
-        _id: null,
-        averageScore: { $avg: { $divide: ["$score", "$maxScore"] } },
-        totalAssessments: { $sum: 1 }
-      }
-    }
-  ]);
+      const filter: any = {};
 
-  // Get subject-wise comparison
-  const subjectComparison = await Performance.aggregate([
-    {
-      $match: {
+      if (studentId) filter.studentId = new mongoose.Types.ObjectId(studentId);
+      if (academicYear) filter.academicYear = academicYear;
+      if (semester) filter.semester = semester;
+      if (subject) filter.subject = subject;
+      if (assessmentType) filter.assessmentType = assessmentType;
+      
+      if (startDate || endDate) {
+        filter.assessmentDate = {};
+        if (startDate) filter.assessmentDate.$gte = new Date(startDate);
+        if (endDate) filter.assessmentDate.$lte = new Date(endDate);
+      }
+
+      const sort: any = {};
+      sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+      const skip = (page - 1) * limit;
+
+      const [performances, total] = await Promise.all([
+        Performance.find(filter)
+          .populate('studentId', 'name rollNumber')
+          .sort(sort)
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        Performance.countDocuments(filter)
+      ]);
+
+      const formattedPerformances = await Promise.all(
+        performances.map(perf => this.formatPerformanceResponse(perf))
+      );
+
+      return {
+        performances: formattedPerformances,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      };
+    } catch (error) {
+      logger.error('Error fetching performances:', error);
+      throw new AppError('Failed to fetch performances', 500);
+    }
+  }
+
+  static async getPerformanceById(id: string): Promise<PerformanceResponse> {
+    try {
+      const performance = await Performance.findById(id)
+        .populate('studentId', 'name rollNumber')
+        .populate('createdBy', 'name')
+        .populate('updatedBy', 'name')
+        .lean();
+
+      if (!performance) {
+        throw new AppError('Performance record not found', 404);
+      }
+
+      return await this.formatPerformanceResponse(performance);
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      logger.error('Error fetching performance by ID:', error);
+      throw new AppError('Failed to fetch performance record', 500);
+    }
+  }
+
+  static async updatePerformance(id: string, data: PerformanceUpdate): Promise<PerformanceResponse> {
+    try {
+      const performance = await Performance.findById(id);
+      if (!performance) {
+        throw new AppError('Performance record not found', 404);
+      }
+
+      // Recalculate percentage if score or maxScore is updated
+      if (data.score !== undefined || data.maxScore !== undefined) {
+        const newScore = data.score ?? performance.score;
+        const newMaxScore = data.maxScore ?? performance.maxScore;
+        data.percentage = (newScore / newMaxScore) * 100;
+      }
+
+      Object.assign(performance, data);
+      await performance.save();
+
+      // Update analytics after updating performance record
+      await this.updateStudentAnalytics(performance.studentId.toString(), performance.academicYear);
+
+      return await this.formatPerformanceResponse(performance);
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      logger.error('Error updating performance:', error);
+      throw new AppError('Failed to update performance record', 500);
+    }
+  }
+
+  static async deletePerformance(id: string): Promise<void> {
+    try {
+      const performance = await Performance.findById(id);
+      if (!performance) {
+        throw new AppError('Performance record not found', 404);
+      }
+
+      await Performance.findByIdAndDelete(id);
+
+      // Update analytics after deleting performance record
+      await this.updateStudentAnalytics(performance.studentId.toString(), performance.academicYear);
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      logger.error('Error deleting performance:', error);
+      throw new AppError('Failed to delete performance record', 500);
+    }
+  }
+
+  /**
+   * Attendance Management
+   */
+  static async createAttendance(data: AttendanceCreate): Promise<AttendanceResponse> {
+    try {
+      // Check if attendance already exists for this student and date
+      const existingAttendance = await Attendance.findOne({
+        studentId: data.studentId,
+        date: data.date
+      });
+
+      if (existingAttendance) {
+        throw new AppError('Attendance already marked for this date', 400);
+      }
+
+      const attendance = new Attendance(data);
+      await attendance.save();
+
+      return await this.formatAttendanceResponse(attendance);
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      logger.error('Error creating attendance:', error);
+      throw new AppError('Failed to create attendance record', 500);
+    }
+  }
+
+  static async getAttendance(query: AttendanceQuery): Promise<AttendanceListResponse> {
+    try {
+      const {
         studentId,
-        date: { $gte: previousStartDate, $lte: currentEndDate },
-        isDeleted: false
+        classId,
+        batchId,
+        date,
+        startDate,
+        endDate,
+        status,
+        page = 1,
+        limit = 10,
+        sortBy = 'date',
+        sortOrder = 'desc'
+      } = query;
+
+      const filter: any = {};
+
+      if (studentId) filter.studentId = new mongoose.Types.ObjectId(studentId);
+      if (classId) filter.classId = new mongoose.Types.ObjectId(classId);
+      if (batchId) filter.batchId = new mongoose.Types.ObjectId(batchId);
+      if (status) filter.status = status;
+      
+      if (date) {
+        filter.date = new Date(date);
+      } else if (startDate || endDate) {
+        filter.date = {};
+        if (startDate) filter.date.$gte = new Date(startDate);
+        if (endDate) filter.date.$lte = new Date(endDate);
       }
-    },
-    {
-      $group: {
-        _id: {
-          subjectId: "$subjectId",
-          period: {
-            $cond: {
-              if: { $and: [{ $gte: ["$date", currentStartDate] }, { $lte: ["$date", currentEndDate] }] },
-              then: "current",
-              else: "previous"
-            }
-          }
-        },
-        averageScore: { $avg: { $divide: ["$score", "$maxScore"] } }
-      }
-    },
-    {
-      $lookup: {
-        from: "subjects",
-        localField: "_id.subjectId",
-        foreignField: "_id",
-        as: "subject"
-      }
-    },
-    { $unwind: "$subject" },
-    {
-      $group: {
-        _id: "$_id.subjectId",
-        subjectName: { $first: "$subject.name" },
-        currentScore: {
-          $avg: {
-            $cond: [
-              { $eq: ["$_id.period", "current"] },
-              "$averageScore",
-              null
-            ]
-          }
-        },
-        previousScore: {
-          $avg: {
-            $cond: [
-              { $eq: ["$_id.period", "previous"] },
-              "$averageScore",
-              null
-            ]
-          }
+
+      const sort: any = {};
+      sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+      const skip = (page - 1) * limit;
+
+      const [attendance, total] = await Promise.all([
+        Attendance.find(filter)
+          .populate('studentId', 'name rollNumber')
+          .populate('classId', 'name')
+          .populate('batchId', 'name')
+          .populate('markedBy', 'name')
+          .sort(sort)
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        Attendance.countDocuments(filter)
+      ]);
+
+      const formattedAttendance = await Promise.all(
+        attendance.map(att => this.formatAttendanceResponse(att))
+      );
+
+      return {
+        attendance: formattedAttendance,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      };
+    } catch (error) {
+      logger.error('Error fetching attendance:', error);
+      throw new AppError('Failed to fetch attendance records', 500);
+    }
+  }
+
+  static async bulkCreateAttendance(data: BulkAttendanceRequest): Promise<AttendanceResponse[]> {
+    try {
+      const { classId, batchId, date, attendance } = data;
+      const attendanceRecords: AttendanceResponse[] = [];
+
+      for (const att of attendance) {
+        try {
+          const attendanceData: AttendanceCreate = {
+            studentId: att.studentId,
+            classId,
+            batchId,
+            date: new Date(date),
+            status: att.status,
+            reason: att.reason,
+            remarks: att.remarks,
+            markedBy: 'system' // This should be the actual user ID
+          };
+
+          const createdAttendance = await this.createAttendance(attendanceData);
+          attendanceRecords.push(createdAttendance);
+        } catch (error) {
+          logger.error(`Error creating attendance for student ${att.studentId}:`, error);
+          // Continue with other records even if one fails
         }
       }
-    },
-    {
-      $project: {
-        subjectId: "$_id",
-        subjectName: 1,
-        currentScore: { $ifNull: ["$currentScore", 0] },
-        previousScore: { $ifNull: ["$previousScore", 0] },
-        improvement: {
-          $subtract: [
-            { $ifNull: ["$currentScore", 0] },
-            { $ifNull: ["$previousScore", 0] }
-          ]
+
+      return attendanceRecords;
+    } catch (error) {
+      logger.error('Error bulk creating attendance:', error);
+      throw new AppError('Failed to bulk create attendance records', 500);
+    }
+  }
+
+  /**
+   * Performance Analytics Management
+   */
+  static async createPerformanceAnalytics(data: PerformanceAnalyticsCreate): Promise<PerformanceAnalyticsResponse> {
+    try {
+      const analytics = new PerformanceAnalytics(data);
+      await analytics.save();
+
+      return await this.formatPerformanceAnalyticsResponse(analytics);
+    } catch (error) {
+      logger.error('Error creating performance analytics:', error);
+      throw new AppError('Failed to create performance analytics', 500);
+    }
+  }
+
+  static async getPerformanceAnalytics(query: PerformanceAnalyticsQuery): Promise<PerformanceAnalyticsListResponse> {
+    try {
+      const {
+        studentId,
+        academicYear,
+        semester,
+        riskScoreMin,
+        riskScoreMax,
+        page = 1,
+        limit = 10,
+        sortBy = 'riskScore',
+        sortOrder = 'desc'
+      } = query;
+
+      const filter: any = {};
+
+      if (studentId) filter.studentId = new mongoose.Types.ObjectId(studentId);
+      if (academicYear) filter.academicYear = academicYear;
+      if (semester) filter.semester = semester;
+      
+      if (riskScoreMin !== undefined || riskScoreMax !== undefined) {
+        filter.riskScore = {};
+        if (riskScoreMin !== undefined) filter.riskScore.$gte = riskScoreMin;
+        if (riskScoreMax !== undefined) filter.riskScore.$lte = riskScoreMax;
+      }
+
+      const sort: any = {};
+      sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+      const skip = (page - 1) * limit;
+
+      const [analytics, total] = await Promise.all([
+        PerformanceAnalytics.find(filter)
+          .populate('studentId', 'name rollNumber')
+          .populate('createdBy', 'name')
+          .populate('updatedBy', 'name')
+          .sort(sort)
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        PerformanceAnalytics.countDocuments(filter)
+      ]);
+
+      const formattedAnalytics = await Promise.all(
+        analytics.map(anal => this.formatPerformanceAnalyticsResponse(anal))
+      );
+
+      return {
+        analytics: formattedAnalytics,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
         }
-      }
+      };
+    } catch (error) {
+      logger.error('Error fetching performance analytics:', error);
+      throw new AppError('Failed to fetch performance analytics', 500);
     }
-  ]);
-
-  const currentAverage = currentStats[0]?.averageScore || 0;
-  const previousAverage = previousStats[0]?.averageScore || 0;
-  const improvement = currentAverage - previousAverage;
-
-  return {
-    studentId,
-    studentName: student.name,
-    currentPeriod: {
-      averageScore: Math.round(currentAverage * 100),
-      totalAssessments: currentStats[0]?.totalAssessments || 0,
-      improvement: Math.round(improvement * 100),
-    },
-    previousPeriod: {
-      averageScore: Math.round(previousAverage * 100),
-      totalAssessments: previousStats[0]?.totalAssessments || 0,
-    },
-    subjectComparison: subjectComparison.map(subject => ({
-      ...subject,
-      currentScore: Math.round(subject.currentScore * 100),
-      previousScore: Math.round(subject.previousScore * 100),
-      improvement: Math.round(subject.improvement * 100),
-    })),
-  };
-};
-
-// Get performance statistics
-export const getPerformanceStats = async (
-  tutorId: string,
-  startDate?: Date,
-  endDate?: Date,
-  studentId?: string,
-  subjectId?: string,
-  assessmentType?: string
-): Promise<PerformanceStats> => {
-  // Get all batches by this tutor
-  const tutorBatches = await Batch.find({
-    tutorId,
-    isDeleted: false,
-  }).select("_id");
-
-  const batchIds = tutorBatches.map(batch => batch._id);
-  
-  // Get all students in these batches
-  const students = await Student.find({
-    batchId: { $in: batchIds },
-    isDeleted: false,
-  }).select("_id");
-
-  const studentIds = students.map(student => student._id);
-
-  const filters: any = { 
-    studentId: { $in: studentIds }, 
-    isDeleted: false 
-  };
-
-  if (startDate || endDate) {
-    filters.date = {};
-    if (startDate) filters.date.$gte = startDate;
-    if (endDate) filters.date.$lte = endDate;
   }
 
-  if (studentId) {
-    filters.studentId = studentId;
-  }
+  static async updateStudentAnalytics(studentId: string, academicYear: string): Promise<void> {
+    try {
+      // Get all performance records for the student
+      const performances = await Performance.find({
+        studentId: new mongoose.Types.ObjectId(studentId),
+        academicYear
+      }).lean();
 
-  if (subjectId) {
-    filters.subjectId = subjectId;
-  }
+      // Get attendance records
+      const attendance = await Attendance.find({
+        studentId: new mongoose.Types.ObjectId(studentId)
+      }).lean();
 
-  if (assessmentType) {
-    filters.assessmentType = assessmentType;
-  }
+      if (performances.length === 0) return;
 
-  const stats = await Performance.aggregate([
-    { $match: filters },
-    {
-      $group: {
-        _id: null,
-        totalAssessments: { $sum: 1 },
-        averageScore: { $avg: { $divide: ["$score", "$maxScore"] } },
-        highestScore: { $max: { $divide: ["$score", "$maxScore"] } },
-        lowestScore: { $min: { $divide: ["$score", "$maxScore"] } },
-        passCount: { $sum: { $cond: [{ $gte: [{ $divide: ["$score", "$maxScore"] }, 0.4] }, 1, 0] } }
-      }
+      // Calculate overall performance
+      const totalScore = performances.reduce((sum, perf) => sum + perf.score, 0);
+      const totalMaxScore = performances.reduce((sum, perf) => sum + perf.maxScore, 0);
+      const overallPercentage = totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : 0;
+
+      // Calculate attendance percentage
+      const totalDays = attendance.length;
+      const presentDays = attendance.filter(att => att.status === 'present').length;
+      const attendancePercentage = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
+
+      // Calculate subject-wise performance
+      const subjectPerformance = new Map();
+      performances.forEach(perf => {
+        if (!subjectPerformance.has(perf.subject)) {
+          subjectPerformance.set(perf.subject, {
+            scores: [],
+            totalAssessments: 0
+          });
+        }
+        const subject = subjectPerformance.get(perf.subject);
+        subject.scores.push(perf.score);
+        subject.totalAssessments++;
+      });
+
+      const subjectsPerformance = Array.from(subjectPerformance.entries()).map(([subject, data]: [string, any]) => ({
+        subject,
+        averageScore: data.scores.reduce((sum: number, score: number) => sum + score, 0) / data.scores.length,
+        totalAssessments: data.totalAssessments,
+        strengths: [], // Will be populated by AI
+        weaknesses: [] // Will be populated by AI
+      }));
+
+      // Build AI input based on available data
+      const historicalData = performances.map(perf => ({
+        testScore: perf.score,
+        date: new Date(perf.assessmentDate),
+        topic: perf.topic || perf.subject,
+      }));
+
+      const prediction = await AIService.predictPerformance({
+        studentId,
+        subject: 'overall',
+        historicalData,
+        upcomingTopics: [],
+      });
+
+      // Determine trends (simplified logic)
+      const performanceTrend = overallPercentage > 75 ? 'improving' : overallPercentage < 50 ? 'declining' : 'stable';
+      const attendanceTrend = attendancePercentage > 90 ? 'improving' : attendancePercentage < 70 ? 'declining' : 'stable';
+      const trends: PerformanceTrends = {
+        performanceTrend,
+        attendanceTrend,
+        engagementTrend: 'stable',
+      };
+
+      // Update or create analytics record
+      const predictedOverall = prediction.overallPrediction;
+      const riskScore = Math.max(0, Math.min(100, 100 - predictedOverall));
+      const predictedGrade = overallPercentage >= 90 ? 'A+' : overallPercentage >= 80 ? 'A' : overallPercentage >= 70 ? 'B' : overallPercentage >= 60 ? 'C' : 'D';
+      const aiRecommendations = prediction.recommendations.map((rec) => ({
+        type: 'improvement_tip' as const,
+        title: rec,
+        description: rec,
+        priority: 'medium' as const,
+      }));
+
+      const analyticsData: PerformanceAnalyticsCreate = {
+        studentId: studentId,
+        academicYear,
+        overallPercentage,
+        attendancePercentage,
+        subjectsPerformance,
+        riskScore,
+        predictedGrade,
+        aiRecommendations,
+        trends,
+        createdBy: 'system',
+        updatedBy: 'system',
+      };
+
+      await PerformanceAnalytics.findOneAndUpdate(
+        { studentId: new mongoose.Types.ObjectId(studentId), academicYear },
+        analyticsData,
+        { upsert: true, new: true }
+      );
+    } catch (error) {
+      logger.error('Error updating student analytics:', error);
+      // Don't throw error as this is a background process
     }
-  ]);
-
-  const performanceByType = await Performance.aggregate([
-    { $match: filters },
-    {
-      $group: {
-        _id: "$assessmentType",
-        count: { $sum: 1 },
-        averageScore: { $avg: { $divide: ["$score", "$maxScore"] } }
-      }
-    },
-    { $sort: { count: -1 } }
-  ]);
-
-  const performanceBySubject = await Performance.aggregate([
-    { $match: filters },
-    {
-      $group: {
-        _id: "$subjectId",
-        count: { $sum: 1 },
-        averageScore: { $avg: { $divide: ["$score", "$maxScore"] } },
-        highestScore: { $max: { $divide: ["$score", "$maxScore"] } }
-      }
-    },
-    {
-      $lookup: {
-        from: "subjects",
-        localField: "_id",
-        foreignField: "_id",
-        as: "subject"
-      }
-    },
-    { $unwind: "$subject" },
-    {
-      $project: {
-        subjectId: "$_id",
-        subjectName: "$subject.name",
-        count: 1,
-        averageScore: 1,
-        highestScore: 1
-      }
-    },
-    { $sort: { averageScore: -1 } }
-  ]);
-
-  // Get recent performance (last 7 days)
-  const recentPerformance = await Performance.countDocuments({
-    ...filters,
-    date: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
-  });
-
-  // Calculate improvement trend (compare last 30 days vs previous 30 days)
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
-
-  const recentTrend = await Performance.aggregate([
-    {
-      $match: {
-        ...filters,
-        date: { $gte: thirtyDaysAgo }
-      }
-    },
-    {
-      $group: {
-        _id: null,
-        averageScore: { $avg: { $divide: ["$score", "$maxScore"] } }
-      }
-    }
-  ]);
-
-  const previousTrend = await Performance.aggregate([
-    {
-      $match: {
-        ...filters,
-        date: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo }
-      }
-    },
-    {
-      $group: {
-        _id: null,
-        averageScore: { $avg: { $divide: ["$score", "$maxScore"] } }
-      }
-    }
-  ]);
-
-  const recentAverage = recentTrend[0]?.averageScore || 0;
-  const previousAverage = previousTrend[0]?.averageScore || 0;
-  const improvementTrend = recentAverage - previousAverage;
-
-  const totalAssessments = stats[0]?.totalAssessments || 0;
-  const averageScore = stats[0]?.averageScore || 0;
-  const passRate = totalAssessments > 0 ? (stats[0]?.passCount / totalAssessments) * 100 : 0;
-
-  return {
-    totalAssessments,
-    averageScore: Math.round(averageScore * 100),
-    highestScore: Math.round((stats[0]?.highestScore || 0) * 100),
-    lowestScore: Math.round((stats[0]?.lowestScore || 0) * 100),
-    passRate: Math.round(passRate),
-    performanceByType: performanceByType.map(type => ({
-      type: type._id,
-      count: type.count,
-      averageScore: Math.round(type.averageScore * 100),
-    })),
-    performanceBySubject: performanceBySubject.map(subject => ({
-      subjectId: subject.subjectId,
-      subjectName: subject.subjectName,
-      count: subject.count,
-      averageScore: Math.round(subject.averageScore * 100),
-      highestScore: Math.round(subject.highestScore * 100),
-    })),
-    recentPerformance,
-    improvementTrend: Math.round(improvementTrend * 100),
-  };
-};
-
-// Get performance heatmap data
-export const getPerformanceHeatmapData = async (
-  batchId: string,
-  subjectIds?: string[],
-  startDate?: Date,
-  endDate?: Date
-): Promise<PerformanceHeatmapData[]> => {
-  const batch = await Batch.findById(batchId);
-  if (!batch) {
-    return [];
   }
 
-  // Get all students in the batch
-  const students = await Student.find({ batchId, isDeleted: false }).select("_id name");
-  const studentIds = students.map(student => student._id);
+  /**
+   * Performance Reports Management
+   */
+  static async generatePerformanceReport(data: GenerateReportRequest): Promise<PerformanceReportResponse> {
+    try {
+      const { studentId, reportType, reportPeriod, startDate, endDate, isScheduled = false } = data;
 
-  const filters: any = { 
-    studentId: { $in: studentIds }, 
-    isDeleted: false 
-  };
-
-  if (startDate || endDate) {
-    filters.date = {};
-    if (startDate) filters.date.$gte = startDate;
-    if (endDate) filters.date.$lte = endDate;
-  }
-
-  if (subjectIds && subjectIds.length > 0) {
-    filters.subjectId = { $in: subjectIds };
-  }
-
-  // Get performance data for each student
-  const performanceData = await Performance.aggregate([
-    { $match: filters },
-    {
-      $group: {
-        _id: {
-          studentId: "$studentId",
-          subjectId: "$subjectId"
+      // Create initial report record
+      const reportData: PerformanceReportCreate = {
+        studentId: studentId,
+        reportType,
+        reportPeriod,
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        reportData: {
+          performanceSummary: { overallPercentage: 0, attendancePercentage: 0, totalAssessments: 0, averageScore: 0 },
+          subjectBreakdown: [],
+          attendanceBreakdown: { totalDays: 0, presentDays: 0, absentDays: 0, lateDays: 0, attendanceTrend: 'stable' },
+          aiInsights: { riskAssessment: '', predictedGrade: '', recommendations: [] }
         },
-        averageScore: { $avg: { $divide: ["$score", "$maxScore"] } }
-      }
-    },
-    {
-      $lookup: {
-        from: "subjects",
-        localField: "_id.subjectId",
-        foreignField: "_id",
-        as: "subject"
-      }
-    },
-    { $unwind: "$subject" },
-    {
-      $group: {
-        _id: "$_id.studentId",
-        subjectPerformance: {
-          $push: {
-            subjectId: "$_id.subjectId",
-            subjectName: "$subject.name",
-            averageScore: "$averageScore"
+        isScheduled,
+        generatedBy: 'system' // This should be the actual user ID
+      };
+
+      const report = new PerformanceReport(reportData);
+      await report.save();
+
+      // Generate report data in background
+      this.generateReportData(report._id.toString(), data);
+
+      return await this.formatPerformanceReportResponse(report);
+    } catch (error) {
+      logger.error('Error generating performance report:', error);
+      throw new AppError('Failed to generate performance report', 500);
+    }
+  }
+
+  private static async generateReportData(reportId: string, data: GenerateReportRequest): Promise<void> {
+    try {
+      const { studentId, startDate, endDate } = data;
+
+      // Get performance data
+      const performances = await Performance.find({
+        studentId: new mongoose.Types.ObjectId(studentId),
+        assessmentDate: { $gte: new Date(startDate), $lte: new Date(endDate) }
+      }).lean();
+
+      // Get attendance data
+      const attendance = await Attendance.find({
+        studentId: new mongoose.Types.ObjectId(studentId),
+        date: { $gte: new Date(startDate), $lte: new Date(endDate) }
+      }).lean();
+
+      // Calculate performance summary
+      const totalScore = performances.reduce((sum, perf) => sum + perf.score, 0);
+      const totalMaxScore = performances.reduce((sum, perf) => sum + perf.maxScore, 0);
+      const overallPercentage = totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : 0;
+      const averageScore = performances.length > 0 ? totalScore / performances.length : 0;
+
+      // Calculate attendance breakdown
+      const totalDays = attendance.length;
+      const presentDays = attendance.filter(att => att.status === 'present').length;
+      const absentDays = attendance.filter(att => att.status === 'absent').length;
+      const lateDays = attendance.filter(att => att.status === 'late').length;
+      const attendancePercentage = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
+
+      // Calculate subject breakdown
+      const subjectPerformance = new Map();
+      performances.forEach(perf => {
+        if (!subjectPerformance.has(perf.subject)) {
+          subjectPerformance.set(perf.subject, {
+            scores: [],
+            totalAssessments: 0
+          });
+        }
+        const subject = subjectPerformance.get(perf.subject);
+        subject.scores.push(perf.score);
+        subject.totalAssessments++;
+      });
+
+      const subjectBreakdown = Array.from(subjectPerformance.entries()).map(([subject, data]: [string, any]) => ({
+        subject,
+        averageScore: data.scores.reduce((sum: number, score: number) => sum + score, 0) / data.scores.length,
+        totalAssessments: data.totalAssessments,
+        strengths: [],
+        weaknesses: []
+      }));
+
+      // Generate AI insights
+      const aiRequest: AIReportGenerationRequest = {
+        studentId,
+        reportType: data.reportType,
+        reportPeriod: data.reportPeriod,
+        startDate,
+        endDate,
+        performanceData: {
+          summary: {
+            overallPercentage,
+            attendancePercentage,
+            totalAssessments: performances.length,
+            averageScore
+          },
+          subjects: subjectBreakdown,
+          attendance: {
+            totalDays,
+            presentDays,
+            absentDays,
+            lateDays,
+            attendanceTrend: attendancePercentage > 90 ? 'improving' : attendancePercentage < 70 ? 'declining' : 'stable'
           }
         },
-        overallAverage: { $avg: "$averageScore" }
-      }
-    },
-    {
-      $lookup: {
-        from: "students",
-        localField: "_id",
-        foreignField: "_id",
-        as: "student"
-      }
-    },
-    { $unwind: "$student" },
-    {
-      $project: {
-        studentId: "$_id",
-        studentName: "$student.name",
-        subjectPerformance: 1,
-        overallAverage: 1
-      }
+        includeCharts: true,
+        includeAIInsights: true
+      };
+
+      const aiReport = await (AIService as any).generateReport?.(aiRequest);
+
+      // Update report with generated data
+      const updateData: PerformanceReportUpdate = {
+        pdfUrl: aiReport?.pdfUrl,
+        excelUrl: aiReport?.excelUrl,
+        status: 'completed'
+      };
+
+      await PerformanceReport.findByIdAndUpdate(reportId, updateData);
+    } catch (error) {
+      logger.error('Error generating report data:', error);
+      await PerformanceReport.findByIdAndUpdate(reportId, {
+        status: 'failed',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
-  ]);
-
-  // Add color coding for heatmap visualization
-  return performanceData.map(data => ({
-    studentId: data.studentId,
-    studentName: data.studentName,
-    subjectPerformance: data.subjectPerformance.map(subject => ({
-      ...subject,
-      averageScore: Math.round(subject.averageScore * 100),
-      color: subject.averageScore >= 0.8 ? "#22c55e" : 
-             subject.averageScore >= 0.6 ? "#eab308" : 
-             subject.averageScore >= 0.4 ? "#f97316" : "#ef4444"
-    })),
-    overallAverage: Math.round(data.overallAverage * 100),
-  }));
-};
-
-// Check if student exists and belongs to tutor's batches
-export const checkStudentAccess = async (studentId: string, tutorId: string) => {
-  const student = await Student.findOne({
-    _id: studentId,
-    isDeleted: false,
-  }).populate("batchId", "tutorId");
-
-  if (!student || (student.batchId as any).tutorId.toString() !== tutorId) {
-    return null;
   }
 
-  return student;
-};
+  static async getPerformanceReports(query: PerformanceReportQuery): Promise<PerformanceReportListResponse> {
+    try {
+      const {
+        studentId,
+        reportType,
+        reportPeriod,
+        startDate,
+        endDate,
+        status,
+        generatedBy,
+        page = 1,
+        limit = 10,
+        sortBy = 'createdAt',
+        sortOrder = 'desc'
+      } = query;
 
-// Check if subject exists
-export const checkSubjectExists = async (subjectId: string) => {
-  const subject = await Subject.findById(subjectId).where({ isDeleted: false });
-  return subject;
-};
+      const filter: any = {};
+
+      if (studentId) filter.studentId = new mongoose.Types.ObjectId(studentId);
+      if (reportType) filter.reportType = reportType;
+      if (reportPeriod) filter.reportPeriod = reportPeriod;
+      if (status) filter.status = status;
+      if (generatedBy) filter.generatedBy = new mongoose.Types.ObjectId(generatedBy);
+      
+      if (startDate || endDate) {
+        filter.createdAt = {};
+        if (startDate) filter.createdAt.$gte = new Date(startDate);
+        if (endDate) filter.createdAt.$lte = new Date(endDate);
+      }
+
+      const sort: any = {};
+      sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+      const skip = (page - 1) * limit;
+
+      const [reports, total] = await Promise.all([
+        PerformanceReport.find(filter)
+          .populate('studentId', 'name rollNumber')
+          .populate('generatedBy', 'name')
+          .sort(sort)
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        PerformanceReport.countDocuments(filter)
+      ]);
+
+      const formattedReports = await Promise.all(
+        reports.map(report => this.formatPerformanceReportResponse(report))
+      );
+
+      return {
+        reports: formattedReports,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      };
+    } catch (error) {
+      logger.error('Error fetching performance reports:', error);
+      throw new AppError('Failed to fetch performance reports', 500);
+    }
+  }
+
+  /**
+   * Performance Alerts Management
+   */
+  static async createPerformanceAlert(data: PerformanceAlertCreate): Promise<PerformanceAlertResponse> {
+    try {
+      const alert = new PerformanceAlert(data);
+      await alert.save();
+
+      // Send alerts through configured channels
+      await this.sendAlertNotifications(alert);
+
+      return await this.formatPerformanceAlertResponse(alert);
+    } catch (error) {
+      logger.error('Error creating performance alert:', error);
+      throw new AppError('Failed to create performance alert', 500);
+    }
+  }
+
+  static async getPerformanceAlerts(query: PerformanceAlertQuery): Promise<PerformanceAlertListResponse> {
+    try {
+      const {
+        studentId,
+        alertType,
+        severity,
+        isSent,
+        isRead,
+        startDate,
+        endDate,
+        page = 1,
+        limit = 10,
+        sortBy = 'createdAt',
+        sortOrder = 'desc'
+      } = query;
+
+      const filter: any = {};
+
+      if (studentId) filter.studentId = new mongoose.Types.ObjectId(studentId);
+      if (alertType) filter.alertType = alertType;
+      if (severity) filter.severity = severity;
+      if (isSent !== undefined) filter.isSent = isSent;
+      if (isRead !== undefined) filter.isRead = isRead;
+      
+      if (startDate || endDate) {
+        filter.createdAt = {};
+        if (startDate) filter.createdAt.$gte = new Date(startDate);
+        if (endDate) filter.createdAt.$lte = new Date(endDate);
+      }
+
+      const sort: any = {};
+      sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+      const skip = (page - 1) * limit;
+
+      const [alerts, total] = await Promise.all([
+        PerformanceAlert.find(filter)
+          .populate('studentId', 'name rollNumber')
+          .populate('createdBy', 'name')
+          .populate('acknowledgedBy', 'name')
+          .sort(sort)
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        PerformanceAlert.countDocuments(filter)
+      ]);
+
+      const formattedAlerts = await Promise.all(
+        alerts.map(alert => this.formatPerformanceAlertResponse(alert))
+      );
+
+      return {
+        alerts: formattedAlerts,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      };
+    } catch (error) {
+      logger.error('Error fetching performance alerts:', error);
+      throw new AppError('Failed to fetch performance alerts', 500);
+    }
+  }
+
+  private static async sendAlertNotifications(alert: IPerformanceAlert): Promise<void> {
+    try {
+      // This would integrate with email, SMS, WhatsApp services
+      // For now, just mark as sent
+      alert.isSent = true;
+      alert.sentAt = new Date();
+      await alert.save();
+
+      logger.info(`Alert sent for student ${alert.studentId}: ${alert.title}`);
+    } catch (error) {
+      logger.error('Error sending alert notifications:', error);
+    }
+  }
+
+  /**
+   * Statistics Methods
+   */
+  static async getPerformanceStats(query: any): Promise<PerformanceStats> {
+    try {
+      const filter: any = {};
+      
+      if (query.studentId) filter.studentId = new mongoose.Types.ObjectId(query.studentId);
+      if (query.academicYear) filter.academicYear = query.academicYear;
+      if (query.semester) filter.semester = query.semester;
+      if (query.subject) filter.subject = query.subject;
+      
+      if (query.startDate || query.endDate) {
+        filter.assessmentDate = {};
+        if (query.startDate) filter.assessmentDate.$gte = new Date(query.startDate);
+        if (query.endDate) filter.assessmentDate.$lte = new Date(query.endDate);
+      }
+
+      const performances = await Performance.find(filter).lean();
+      
+      if (performances.length === 0) {
+        return {
+          totalAssessments: 0,
+          averageScore: 0,
+          highestScore: 0,
+          lowestScore: 0,
+          subjectsCount: 0,
+          studentsCount: 0
+        };
+      }
+
+      const totalScore = performances.reduce((sum, perf) => sum + perf.score, 0);
+      const scores = performances.map(perf => perf.score);
+      const subjects = new Set(performances.map(perf => perf.subject));
+      const students = new Set(performances.map(perf => perf.studentId.toString()));
+
+      return {
+        totalAssessments: performances.length,
+        averageScore: totalScore / performances.length,
+        highestScore: Math.max(...scores),
+        lowestScore: Math.min(...scores),
+        subjectsCount: subjects.size,
+        studentsCount: students.size
+      };
+    } catch (error) {
+      logger.error('Error getting performance stats:', error);
+      throw new AppError('Failed to get performance statistics', 500);
+    }
+  }
+
+  static async getAttendanceStats(query: any): Promise<AttendanceStats> {
+    try {
+      const filter: any = {};
+      
+      if (query.studentId) filter.studentId = new mongoose.Types.ObjectId(query.studentId);
+      if (query.classId) filter.classId = new mongoose.Types.ObjectId(query.classId);
+      if (query.batchId) filter.batchId = new mongoose.Types.ObjectId(query.batchId);
+      
+      if (query.startDate || query.endDate) {
+        filter.date = {};
+        if (query.startDate) filter.date.$gte = new Date(query.startDate);
+        if (query.endDate) filter.date.$lte = new Date(query.endDate);
+      }
+
+      const attendance = await Attendance.find(filter).lean();
+      
+      if (attendance.length === 0) {
+        return {
+          totalDays: 0,
+          presentDays: 0,
+          absentDays: 0,
+          lateDays: 0,
+          attendancePercentage: 0,
+          studentsCount: 0
+        };
+      }
+
+      const presentDays = attendance.filter(att => att.status === 'present').length;
+      const absentDays = attendance.filter(att => att.status === 'absent').length;
+      const lateDays = attendance.filter(att => att.status === 'late').length;
+      const students = new Set(attendance.map(att => att.studentId.toString()));
+
+      return {
+        totalDays: attendance.length,
+        presentDays,
+        absentDays,
+        lateDays,
+        attendancePercentage: (presentDays / attendance.length) * 100,
+        studentsCount: students.size
+      };
+    } catch (error) {
+      logger.error('Error getting attendance stats:', error);
+      throw new AppError('Failed to get attendance statistics', 500);
+    }
+  }
+
+  /**
+   * Response Formatting Methods
+   */
+  private static async formatPerformanceResponse(performance: any): Promise<PerformanceResponse> {
+    return {
+      id: performance._id.toString(),
+      studentId: performance.studentId._id?.toString() || performance.studentId.toString(),
+      studentName: performance.studentId.name,
+      academicYear: performance.academicYear,
+      semester: performance.semester,
+      subject: performance.subject,
+      topic: performance.topic,
+      assessmentType: performance.assessmentType,
+      score: performance.score,
+      maxScore: performance.maxScore,
+      percentage: performance.percentage,
+      grade: performance.grade,
+      remarks: performance.remarks,
+      assessmentDate: performance.assessmentDate.toISOString(),
+      submittedDate: performance.submittedDate?.toISOString(),
+      isLate: performance.isLate || false,
+      weightage: performance.weightage || 100,
+      createdBy: performance.createdBy.toString(),
+      updatedBy: performance.updatedBy.toString(),
+      createdAt: performance.createdAt.toISOString(),
+      updatedAt: performance.updatedAt.toISOString()
+    };
+  }
+
+  private static async formatAttendanceResponse(attendance: any): Promise<AttendanceResponse> {
+    return {
+      id: attendance._id.toString(),
+      studentId: attendance.studentId._id?.toString() || attendance.studentId.toString(),
+      studentName: attendance.studentId.name,
+      classId: attendance.classId?._id?.toString(),
+      className: attendance.classId?.name,
+      batchId: attendance.batchId?._id?.toString(),
+      batchName: attendance.batchId?.name,
+      date: attendance.date.toISOString(),
+      status: attendance.status,
+      reason: attendance.reason,
+      remarks: attendance.remarks,
+      markedBy: attendance.markedBy._id?.toString() || attendance.markedBy.toString(),
+      markedByName: attendance.markedBy.name,
+      createdAt: attendance.createdAt.toISOString(),
+      updatedAt: attendance.updatedAt.toISOString()
+    };
+  }
+
+  private static async formatPerformanceAnalyticsResponse(analytics: any): Promise<PerformanceAnalyticsResponse> {
+    return {
+      id: analytics._id.toString(),
+      studentId: analytics.studentId._id?.toString() || analytics.studentId.toString(),
+      studentName: analytics.studentId.name,
+      academicYear: analytics.academicYear,
+      semester: analytics.semester,
+      overallPercentage: analytics.overallPercentage,
+      attendancePercentage: analytics.attendancePercentage,
+      subjectsPerformance: analytics.subjectsPerformance,
+      riskScore: analytics.riskScore,
+      riskLevel: analytics.riskLevel || 'low',
+      predictedGrade: analytics.predictedGrade,
+      aiRecommendations: analytics.aiRecommendations,
+      trends: analytics.trends,
+      lastUpdated: analytics.lastUpdated.toISOString(),
+      createdBy: analytics.createdBy._id?.toString() || analytics.createdBy.toString(),
+      updatedBy: analytics.updatedBy._id?.toString() || analytics.updatedBy.toString(),
+      createdAt: analytics.createdAt.toISOString(),
+      updatedAt: analytics.updatedAt.toISOString()
+    };
+  }
+
+  private static async formatPerformanceReportResponse(report: any): Promise<PerformanceReportResponse> {
+    return {
+      id: report._id.toString(),
+      studentId: report.studentId._id?.toString() || report.studentId.toString(),
+      studentName: report.studentId.name,
+      reportType: report.reportType,
+      reportPeriod: report.reportPeriod,
+      startDate: report.startDate.toISOString(),
+      endDate: report.endDate.toISOString(),
+      reportData: report.reportData,
+      pdfUrl: report.pdfUrl,
+      excelUrl: report.excelUrl,
+      generatedBy: report.generatedBy._id?.toString() || report.generatedBy.toString(),
+      generatedByName: report.generatedBy.name,
+      isScheduled: report.isScheduled,
+      status: report.status,
+      errorMessage: report.errorMessage,
+      createdAt: report.createdAt.toISOString(),
+      updatedAt: report.updatedAt.toISOString()
+    };
+  }
+
+  private static async formatPerformanceAlertResponse(alert: any): Promise<PerformanceAlertResponse> {
+    return {
+      id: alert._id.toString(),
+      studentId: alert.studentId._id?.toString() || alert.studentId.toString(),
+      studentName: alert.studentId.name,
+      alertType: alert.alertType,
+      severity: alert.severity,
+      title: alert.title,
+      message: alert.message,
+      data: alert.data,
+      channels: alert.channels,
+      isSent: alert.isSent,
+      sentAt: alert.sentAt?.toISOString(),
+      isRead: alert.isRead,
+      readAt: alert.readAt?.toISOString(),
+      acknowledgedBy: alert.acknowledgedBy?._id?.toString(),
+      acknowledgedByName: alert.acknowledgedBy?.name,
+      createdBy: alert.createdBy._id?.toString() || alert.createdBy.toString(),
+      createdByName: alert.createdBy.name,
+      createdAt: alert.createdAt.toISOString(),
+      updatedAt: alert.updatedAt.toISOString()
+    };
+  }
+}
 
 

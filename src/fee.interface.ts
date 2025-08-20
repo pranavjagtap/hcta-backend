@@ -1,6 +1,19 @@
 // Fee Module Interface
 // This file defines the public interface for the Fee module
 
+import { 
+  FeeBase,
+  FeeDocument,
+  FeeUpdate,
+  FeeQuery,
+  FeeStats,
+  FeeSummary,
+  FeePayment,
+  FeeBulkOperation,
+  FeeReport,
+} from './types/fee';
+import { Request, Response } from 'express';
+
 export interface IFeeService {
   // Core CRUD operations
   createFee(data: FeeBase): Promise<FeeDocument>;

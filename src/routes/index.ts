@@ -1,40 +1,43 @@
-import express from "express";
-import userRoutes from "./user";
-import batchRoutes from "./batch";
-import studentRoutes from "./student";
-import subjectRoutes from "./subject";
-import teachingLogRoutes from "./teachingLog";
-import assignmentRoutes from "./assignment";
-import submissionRoutes from "./submission";
-import noteRoutes from "./note";
-import performanceRoutes from "./performance";
-import dashboardRoutes from "./dashboard";
-import feeRoutes from "./fee";
-import authRoutes from "./auth";
+import { Router } from 'express';
+import authRoutes from './auth';
+import userRoutes from './user';
+import batchRoutes from './batch';
+import subjectRoutes from './subject';
+import contentRoutes from './content';
+import chatRoutes from './chat';
+import callRoutes from './calls';
+import doubtRoutes from './doubts';
+import availabilityRoutes from './availability';
+import notificationRoutes from './notifications';
 
-const router = express.Router();
+// Module 7: Payment & Subscription Management
+import subscriptionPlanRoutes from './subscriptionPlans';
+import subscriptionRoutes from './subscriptions';
+import paymentRoutes from './payments';
+import couponRoutes from './coupons';
+import analyticsRoutes from './analytics';
 
-// Health check endpoint (no authentication required)
-router.get("/health", (req, res) => {
-  res.json({ 
-    status: "OK", 
-    message: "HCTA Backend Server is running",
-    timestamp: new Date().toISOString(),
-    version: "1.0.0"
-  });
-});
+const router = Router();
 
-router.use("/auth", authRoutes);
-router.use("/users", userRoutes);
-router.use("/batches", batchRoutes);
-router.use("/students", studentRoutes);
-router.use("/subjects", subjectRoutes);
-router.use("/teaching-logs", teachingLogRoutes);
-router.use("/assignments", assignmentRoutes);
-router.use("/submissions", submissionRoutes);
-router.use("/notes", noteRoutes);
-router.use("/performance", performanceRoutes);
-router.use("/dashboard", dashboardRoutes);
-router.use("/fees", feeRoutes);
+// API Routes
+router.use('/auth', authRoutes);
+router.use('/users', userRoutes);
+router.use('/batches', batchRoutes);
+router.use('/subjects', subjectRoutes);
+router.use('/content', contentRoutes);
+
+// Module 6: Communication & Doubt-Solving
+router.use('/chat', chatRoutes);
+router.use('/calls', callRoutes);
+router.use('/doubts', doubtRoutes);
+router.use('/availability', availabilityRoutes);
+router.use('/notifications', notificationRoutes);
+
+// Module 7: Payment & Subscription Management
+router.use('/subscription-plans', subscriptionPlanRoutes);
+router.use('/subscriptions', subscriptionRoutes);
+router.use('/payments', paymentRoutes);
+router.use('/coupons', couponRoutes);
+router.use('/analytics', analyticsRoutes);
 
 export default router;

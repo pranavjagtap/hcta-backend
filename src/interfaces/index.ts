@@ -3,37 +3,34 @@
 // ===== MODULE INTERFACES =====
 
 // User Module
-export * from "./user.interface";
+export * as UserInterfaces from "./user.interface";
 
 // Batch Module
-export * from "./batch.interface";
+export * as BatchInterfaces from "./batch.interface";
 
 // Student Module
-export * from "./student.interface";
+export * as StudentInterfaces from "./student.interface";
 
 // Subject Module
-export * from "./subject.interface";
+export * as SubjectInterfaces from "./subject.interface";
 
 // Fee Module
-export * from "./fee.interface";
+export * as FeeInterfaces from "./fee.interface";
 
 // Dashboard Module
-export * from "./dashboard.interface";
+export * as DashboardInterfaces from "./dashboard.interface";
 
 // Note Module
-export * from "./note.interface";
-
-// Assignment Module
-export * from "./assignment.interface";
+export * as NoteInterfaces from "./note.interface";
 
 // Submission Module
-export * from "./submission.interface";
+export * as SubmissionInterfaces from "./submission.interface";
 
 // Performance Module
-export * from "./performance.interface";
+export * as PerformanceInterfaces from "./performance.interface";
 
 // TeachingLog Module
-export * from "./teachingLog.interface";
+export * as TeachingLogInterfaces from "./teachingLog.interface";
 
 // ===== COMMON TYPES =====
 

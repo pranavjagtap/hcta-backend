@@ -1,6 +1,6 @@
 import { Assignment } from "../models/assignment";
 import { Batch } from "../models/batch";
-import Subject from "../models/subject";
+import { Subject } from "../models/subject";
 import { Submission } from "../models/submission";
 import { FilterQuery } from "mongoose";
 import { AssignmentBase, AssignmentUpdate, AssignmentStats, UpcomingAssignment, AssignmentQuery } from "../types/assignment";
@@ -194,17 +194,18 @@ export const getUpcomingAssignments = async (tutorId: string, days: number = 7, 
       const batch = assignment.batchId as any;
       const totalStudents = batch.studentIds ? batch.studentIds.length : 0;
 
-      const daysUntilDue = Math.ceil(
-        (new Date(assignment.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
-      );
+      const due = assignment.dueDate ? new Date(assignment.dueDate as any) : null;
+      const daysUntilDue = due
+        ? Math.ceil((due.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+        : 0;
 
       return {
         _id: assignment._id.toString(),
         topic: assignment.topic,
         batchName: batch.name,
-        subjectName: assignment.subjectId?.name,
+        subjectName: (assignment as any).subjectId?.name || undefined,
         type: assignment.type,
-        dueDate: assignment.dueDate.toISOString(),
+        dueDate: due ? due.toISOString() : new Date().toISOString(),
         daysUntilDue,
         submissionCount,
         totalStudents

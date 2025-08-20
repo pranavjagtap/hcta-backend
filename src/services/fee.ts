@@ -1,8 +1,6 @@
 import { Fee } from "../models/fee";
 import { FilterQuery } from "mongoose";
-import { FeeBase, FeeUpdate, FeeQuery, FeeStats, FeeSummary, FeePayment, FeeBulkOperation, FeeReport } from "../types/fee";
-import Student from "../models/student";
-import Batch from "../models/batch";
+import { FeeBase, FeeUpdate, FeeStats, FeeSummary, FeePayment, FeeBulkOperation, FeeReport } from "../types/fee";
 
 // Create fee
 export const createFee = async (data: FeeBase) => {

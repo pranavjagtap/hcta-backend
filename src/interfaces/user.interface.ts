@@ -106,7 +106,7 @@ export interface UserListResponse {
   };
 }
 
-export interface UserStatsResponse {
+export interface UserStatsData {
   total: number;
   active: number;
   recent: number;
@@ -140,7 +140,7 @@ export type GetUserResponse = ApiResponse<UserResponse>;
 export type GetUsersResponse = ApiResponse<UserListResponse>;
 export type UpdateUserResponse = ApiResponse<UserResponse>;
 export type DeleteUserResponse = ApiResponse<{ message: string }>;
-export type UserStatsResponse = ApiResponse<UserStatsResponse>;
+export type UserStatsResponse = ApiResponse<UserStatsData>;
 export type ChangePasswordResponse = ApiResponse<{ message: string }>;
 export type ToggleStatusResponse = ApiResponse<UserResponse>;
 

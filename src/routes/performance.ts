@@ -1,60 +1,340 @@
-import express from "express";
+import { Router } from 'express';
+import { authenticate } from '../middlewares/authenticate';
+import { authorize } from '../middlewares/authorize';
 import {
+  // Performance Records Controllers
   createPerformanceController,
-  getTutorPerformancesController,
+  getPerformancesController,
   getPerformanceByIdController,
   updatePerformanceController,
   deletePerformanceController,
-  bulkCreatePerformancesController,
-  getStudentPerformancesController,
-  getStudentPerformanceSummaryController,
-  getBatchPerformanceSummaryController,
-  getPerformanceComparisonController,
+  recordPerformanceController,
+  bulkUploadPerformancesController,
+  
+  // Attendance Controllers
+  createAttendanceController,
+  getAttendanceController,
+  getAttendanceByIdController,
+  updateAttendanceController,
+  deleteAttendanceController,
+  recordAttendanceController,
+  bulkCreateAttendanceController,
+  bulkUploadAttendanceController,
+  
+  // Performance Analytics Controllers
+  createPerformanceAnalyticsController,
+  getPerformanceAnalyticsController,
+  getPerformanceAnalyticsByIdController,
+  updatePerformanceAnalyticsController,
+  deletePerformanceAnalyticsController,
+  updateStudentAnalyticsController,
+  
+  // Performance Reports Controllers
+  generatePerformanceReportController,
+  getPerformanceReportsController,
+  getPerformanceReportByIdController,
+  updatePerformanceReportController,
+  deletePerformanceReportController,
+  retryReportGenerationController,
+  
+  // Performance Alerts Controllers
+  createPerformanceAlertController,
+  getPerformanceAlertsController,
+  getPerformanceAlertByIdController,
+  updatePerformanceAlertController,
+  deletePerformanceAlertController,
+  sendAlertController,
+  markAlertAsReadController,
+  acknowledgeAlertController,
+  
+  // Statistics Controllers
   getPerformanceStatsController,
-  getPerformanceHeatmapController,
-} from "../controllers/performance";
-import { authenticate } from "../middlewares/authenticate";
-import { authorize } from "../middlewares/authorize";
+  getAttendanceStatsController,
+  getAnalyticsStatsController,
+  getAlertStatsController,
+  
+  // Dashboard Controllers
+  getPerformanceDashboardController,
+  getClassPerformanceController,
+  getBatchPerformanceController
+} from '../controllers/performance';
 
-const router = express.Router();
+const router = Router();
 
 // Apply authentication middleware to all routes
 router.use(authenticate);
 
-// Get performance statistics
-router.get("/stats", authorize(["teacher", "admin"]), getPerformanceStatsController);
+/**
+ * Performance Records Routes
+ */
+router.post(
+  '/record',
+  authorize(['manage_performance', 'view_performance']),
+  recordPerformanceController
+);
 
-// Get performance comparison
-router.get("/comparison", authorize(["teacher", "admin"]), getPerformanceComparisonController);
+router.post(
+  '/',
+  authorize(['manage_performance']),
+  createPerformanceController
+);
 
-// Get performance heatmap data
-router.get("/heatmap/:batchId", authorize(["teacher", "admin"]), getPerformanceHeatmapController);
+router.get(
+  '/',
+  authorize(['view_performance']),
+  getPerformancesController
+);
 
-// Get batch performance summary
-router.get("/batch/:batchId/summary", authorize(["teacher", "admin"]), getBatchPerformanceSummaryController);
+router.get(
+  '/:id',
+  authorize(['view_performance']),
+  getPerformanceByIdController
+);
 
-// Get student performance summary
-router.get("/student/:studentId/summary", authorize(["teacher", "admin"]), getStudentPerformanceSummaryController);
+router.put(
+  '/:id',
+  authorize(['manage_performance']),
+  updatePerformanceController
+);
 
-// Get performances for a specific student
-router.get("/student/:studentId", authorize(["teacher", "admin"]), getStudentPerformancesController);
+router.delete(
+  '/:id',
+  authorize(['manage_performance']),
+  deletePerformanceController
+);
 
-// Create a new performance record
-router.post("/", authorize(["teacher", "admin"]), createPerformanceController);
+router.post(
+  '/bulk-upload',
+  authorize(['manage_performance']),
+  bulkUploadPerformancesController
+);
 
-// Bulk create performance records
-router.post("/bulk", authorize(["teacher", "admin"]), bulkCreatePerformancesController);
+/**
+ * Attendance Routes
+ */
+router.post(
+  '/attendance/record',
+  authorize(['manage_attendance', 'view_attendance']),
+  recordAttendanceController
+);
 
-// Get all performances for the authenticated tutor
-router.get("/", authorize(["teacher", "admin"]), getTutorPerformancesController);
+router.post(
+  '/attendance',
+  authorize(['manage_attendance']),
+  createAttendanceController
+);
 
-// Get performance by ID
-router.get("/:id", authorize(["teacher", "admin"]), getPerformanceByIdController);
+router.get(
+  '/attendance',
+  authorize(['view_attendance']),
+  getAttendanceController
+);
 
-// Update performance
-router.put("/:id", authorize(["teacher", "admin"]), updatePerformanceController);
+router.get(
+  '/attendance/:id',
+  authorize(['view_attendance']),
+  getAttendanceByIdController
+);
 
-// Delete performance
-router.delete("/:id", authorize(["teacher", "admin"]), deletePerformanceController);
+router.put(
+  '/attendance/:id',
+  authorize(['manage_attendance']),
+  updateAttendanceController
+);
+
+router.delete(
+  '/attendance/:id',
+  authorize(['manage_attendance']),
+  deleteAttendanceController
+);
+
+router.post(
+  '/attendance/bulk',
+  authorize(['manage_attendance']),
+  bulkCreateAttendanceController
+);
+
+router.post(
+  '/attendance/bulk-upload',
+  authorize(['manage_attendance']),
+  bulkUploadAttendanceController
+);
+
+/**
+ * Performance Analytics Routes
+ */
+router.post(
+  '/analytics',
+  authorize(['manage_analytics']),
+  createPerformanceAnalyticsController
+);
+
+router.get(
+  '/analytics',
+  authorize(['view_analytics']),
+  getPerformanceAnalyticsController
+);
+
+router.get(
+  '/analytics/:id',
+  authorize(['view_analytics']),
+  getPerformanceAnalyticsByIdController
+);
+
+router.put(
+  '/analytics/:id',
+  authorize(['manage_analytics']),
+  updatePerformanceAnalyticsController
+);
+
+router.delete(
+  '/analytics/:id',
+  authorize(['manage_analytics']),
+  deletePerformanceAnalyticsController
+);
+
+router.post(
+  '/analytics/update/:studentId/:academicYear',
+  authorize(['manage_analytics']),
+  updateStudentAnalyticsController
+);
+
+/**
+ * Performance Reports Routes
+ */
+router.post(
+  '/reports/generate',
+  authorize(['manage_reports', 'view_reports']),
+  generatePerformanceReportController
+);
+
+router.get(
+  '/reports',
+  authorize(['view_reports']),
+  getPerformanceReportsController
+);
+
+router.get(
+  '/reports/:id',
+  authorize(['view_reports']),
+  getPerformanceReportByIdController
+);
+
+router.put(
+  '/reports/:id',
+  authorize(['manage_reports']),
+  updatePerformanceReportController
+);
+
+router.delete(
+  '/reports/:id',
+  authorize(['manage_reports']),
+  deletePerformanceReportController
+);
+
+router.post(
+  '/reports/:id/retry',
+  authorize(['manage_reports']),
+  retryReportGenerationController
+);
+
+/**
+ * Performance Alerts Routes
+ */
+router.post(
+  '/alerts',
+  authorize(['manage_alerts']),
+  createPerformanceAlertController
+);
+
+router.get(
+  '/alerts',
+  authorize(['view_alerts']),
+  getPerformanceAlertsController
+);
+
+router.get(
+  '/alerts/:id',
+  authorize(['view_alerts']),
+  getPerformanceAlertByIdController
+);
+
+router.put(
+  '/alerts/:id',
+  authorize(['manage_alerts']),
+  updatePerformanceAlertController
+);
+
+router.delete(
+  '/alerts/:id',
+  authorize(['manage_alerts']),
+  deletePerformanceAlertController
+);
+
+router.post(
+  '/alerts/send',
+  authorize(['manage_alerts']),
+  sendAlertController
+);
+
+router.put(
+  '/alerts/:id/read',
+  authorize(['view_alerts']),
+  markAlertAsReadController
+);
+
+router.put(
+  '/alerts/:id/acknowledge',
+  authorize(['manage_alerts']),
+  acknowledgeAlertController
+);
+
+/**
+ * Statistics Routes
+ */
+router.get(
+  '/stats/performance',
+  authorize(['view_performance']),
+  getPerformanceStatsController
+);
+
+router.get(
+  '/stats/attendance',
+  authorize(['view_attendance']),
+  getAttendanceStatsController
+);
+
+router.get(
+  '/stats/analytics',
+  authorize(['view_analytics']),
+  getAnalyticsStatsController
+);
+
+router.get(
+  '/stats/alerts',
+  authorize(['view_alerts']),
+  getAlertStatsController
+);
+
+/**
+ * Dashboard Routes
+ */
+router.get(
+  '/dashboard/student',
+  authorize(['view_performance', 'view_analytics']),
+  getPerformanceDashboardController
+);
+
+router.get(
+  '/dashboard/class',
+  authorize(['view_performance', 'view_analytics']),
+  getClassPerformanceController
+);
+
+router.get(
+  '/dashboard/batch',
+  authorize(['view_performance', 'view_analytics']),
+  getBatchPerformanceController
+);
 
 export default router;

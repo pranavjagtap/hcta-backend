@@ -1,5 +1,7 @@
 // src/config/firebase.ts
-import admin from "firebase-admin";
+// Using dynamic require to avoid needing type declarations at build time
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const admin = require("firebase-admin");
 import * as dotenv from "dotenv";
 dotenv.config();
 
@@ -23,7 +25,7 @@ if (!admin.apps.length) {
   });
 }
 
-export default admin;
+export default admin as any;
 
 // admin.initializeApp({
 //   credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),

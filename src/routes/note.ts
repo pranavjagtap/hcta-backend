@@ -21,40 +21,40 @@ const router = express.Router();
 // Apply authentication middleware to all routes
 router.use(authenticate);
 
-// Get note statistics
-router.get("/stats", authorize(["teacher", "admin"]), getNoteStatsController);
-
-// Search notes
-router.get("/search", authorize(["teacher", "admin"]), searchNotesController);
-
-// Get batch notes summary
-router.get("/batch/:batchId/summary", authorize(["teacher", "admin"]), getBatchNotesSummaryController);
-
-// Get notes for a specific batch
-router.get("/batch/:batchId", authorize(["teacher", "admin"]), getBatchNotesController);
-
 // Create a new note
-router.post("/", authorize(["teacher", "admin"]), createNoteController);
+router.post("/", authorize(["manage_notes", "upload_notes"]), createNoteController);
 
 // Get all notes for the authenticated tutor
-router.get("/", authorize(["teacher", "admin"]), getTutorNotesController);
+router.get("/", authorize(["manage_notes", "upload_notes", "view_notes"]), getTutorNotesController);
+
+// Get note statistics
+router.get("/stats", authorize(["manage_notes", "upload_notes"]), getNoteStatsController);
+
+// Search notes
+router.get("/search", authorize(["manage_notes", "upload_notes", "view_notes"]), searchNotesController);
+
+// Get batch notes summary
+router.get("/batch/:batchId/summary", authorize(["manage_notes", "upload_notes"]), getBatchNotesSummaryController);
+
+// Get notes for a specific batch
+router.get("/batch/:batchId", authorize(["manage_notes", "upload_notes", "view_notes"]), getBatchNotesController);
 
 // Get note by ID
-router.get("/:id", authorize(["teacher", "admin"]), getNoteByIdController);
+router.get("/:id", authorize(["manage_notes", "upload_notes", "view_notes"]), getNoteByIdController);
 
 // Update note
-router.put("/:id", authorize(["teacher", "admin"]), updateNoteController);
+router.put("/:id", authorize(["manage_notes", "upload_notes"]), updateNoteController);
 
 // Toggle note public status
-router.patch("/:id/public", authorize(["teacher", "admin"]), toggleNotePublicController);
+router.patch("/:id/public", authorize(["manage_notes", "upload_notes"]), toggleNotePublicController);
 
 // Approve/reject note
-router.patch("/:id/approve", authorize(["teacher", "admin"]), approveNoteController);
+router.patch("/:id/approve", authorize(["manage_notes"]), approveNoteController);
 
 // Bulk update notes
-router.patch("/bulk", authorize(["teacher", "admin"]), bulkUpdateNotesController);
+router.patch("/bulk", authorize(["manage_notes", "upload_notes"]), bulkUpdateNotesController);
 
 // Delete note
-router.delete("/:id", authorize(["teacher", "admin"]), deleteNoteController);
+router.delete("/:id", authorize(["manage_notes", "upload_notes"]), deleteNoteController);
 
 export default router;

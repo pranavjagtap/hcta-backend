@@ -8,9 +8,32 @@ const studentSchema = new Schema<StudentDocument>(
       required: true,
       index: true,
     },
+    rollNumber: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+    },
+    classId: {
+      type: Schema.Types.ObjectId,
+      ref: "Class",
+      index: true,
+    },
+    batchId: {
+      type: Schema.Types.ObjectId,
+      ref: "Batch",
+      index: true,
+    },
     parentName: String,
     parentPhone: String,
     whatsappNumber: String,
+    guardianInfo: {
+      name: String,
+      relationship: String,
+      phone: String,
+      email: String,
+      address: String,
+    },
     schoolName: String,
     board: {
       type: String,
@@ -20,18 +43,13 @@ const studentSchema = new Schema<StudentDocument>(
       type: String,
       index: true,
     },
-    batchId: {
-      type: Schema.Types.ObjectId,
-      ref: "Batch",
-      index: true,
+    profilePicture: {
+      url: String,
+      key: String, // S3 key for deletion
     },
     weaknesses: {
       type: [String],
       default: [],
-    },
-    rollNumber: {
-      type: String,
-      index: true,
     },
     admissionDate: Date,
     isDeleted: {

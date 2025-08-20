@@ -25,27 +25,27 @@ router.put("/profile", update);
 
 // Admin only routes for user management
 // Get user statistics
-router.get("/stats", authorize(["admin"]), getUserStats);
+router.get("/stats", authorize(["manage_users"]), getUserStats);
 
 // Create new user
-router.post("/", authorize(["admin"]), create);
+router.post("/", authorize(["manage_users"]), create);
 
 // Get all users with pagination and search
-router.get("/", authorize(["admin"]), getAll);
+router.get("/", authorize(["manage_users"]), getAll);
 
 // Get user by ID
-router.get("/:id", authorize(["admin"]), getById);
+router.get("/:id", authorize(["manage_users"]), getById);
 
 // Update user
-router.put("/:id", authorize(["admin"]), update);
+router.put("/:id", authorize(["manage_users"]), update);
 
 // Change user password
-router.patch("/:id/change-password", authorize(["admin"]), changeUserPassword);
+router.patch("/:id/change-password", authorize(["manage_users"]), changeUserPassword);
 
 // Toggle user active/inactive status
-router.patch("/:id/toggle-status", authorize(["admin"]), toggleUserStatus);
+router.patch("/:id/toggle-status", authorize(["manage_users"]), toggleUserStatus);
 
 // Soft delete user
-router.delete("/:id", authorize(["admin"]), softDelete);
+router.delete("/:id", authorize(["manage_users"]), softDelete);
 
 export default router;

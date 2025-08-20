@@ -54,11 +54,15 @@ export const create = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const fee = await createFee({
+    const createPayload = {
       ...parsed.data,
-      createdBy: req.user?._id,
-      updatedBy: req.user?._id,
-    });
+      ...(parsed.data.paymentDate
+        ? { paymentDate: new Date(parsed.data.paymentDate as any) }
+        : {}),
+      createdBy: (req as any).user?._id as string,
+      updatedBy: (req as any).user?._id as string,
+    };
+    const fee = await createFee(createPayload as any);
 
     res.status(201).json({
       success: true,
@@ -159,10 +163,14 @@ export const update = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const fee = await updateFee(id, {
+    const updatePayload = {
       ...parsed.data,
-      updatedBy: req.user?._id,
-    });
+      ...(parsed.data.paymentDate
+        ? { paymentDate: new Date(parsed.data.paymentDate as any) }
+        : {}),
+      updatedBy: (req as any).user?._id as string,
+    };
+    const fee = await updateFee(id, updatePayload as any);
 
     if (!fee) {
       res.status(404).json({
@@ -226,10 +234,14 @@ export const processPayment = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const fee = await processFeePayment({
+    const paymentPayload = {
       ...parsed.data,
-      updatedBy: req.user?._id,
-    });
+      ...(parsed.data.paymentDate
+        ? { paymentDate: new Date(parsed.data.paymentDate as any) }
+        : {}),
+      updatedBy: (req as any).user?._id as string,
+    };
+    const fee = await processFeePayment(paymentPayload as any);
 
     res.status(200).json({
       success: true,
@@ -277,8 +289,8 @@ export const createBulk = async (req: Request, res: Response): Promise<void> => 
 
     const fees = await createBulkFees({
       ...parsed.data,
-      createdBy: req.user?._id,
-    });
+      createdBy: (req as any).user?._id as string,
+    } as any);
 
     res.status(201).json({
       success: true,
@@ -400,7 +412,7 @@ export const toggleLock = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    const fee = await toggleFeeLock(id, isLocked, req.user?._id);
+    const fee = await toggleFeeLock(id, isLocked, (req as any).user?._id as string);
 
     if (!fee) {
       res.status(404).json({

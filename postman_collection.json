@@ -1,0 +1,1042 @@
+{
+  "info": {
+    "name": "HCTA API Collection",
+    "description": "Complete API collection for HCTA (Home Coaching & Tutoring Application) backend",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:4000/api",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "batch_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "student_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "assignment_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Test Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@hcta.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/test-login",
+              "host": ["{{base_url}}"],
+              "path": ["test-login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set('auth_token', response.token);",
+                  "    pm.environment.set('user_id', response.user.id);",
+                  "    console.log('Token saved:', response.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Firebase Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idToken\": \"your_firebase_id_token_here\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "Health Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "User Management",
+      "item": [
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/users?page=1&limit=10&search=&role=&city=",
+              "host": ["{{base_url}}"],
+              "path": ["users"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "search",
+                  "value": ""
+                },
+                {
+                  "key": "role",
+                  "value": ""
+                },
+                {
+                  "key": "city",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Tutor\",\n  \"email\": \"tutor@example.com\",\n  \"phone\": \"+1234567890\",\n  \"role\": \"tutor\",\n  \"status\": \"active\",\n  \"city\": \"Test City\",\n  \"address\": \"Test Address\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/users",
+              "host": ["{{base_url}}"],
+              "path": ["users"]
+            }
+          }
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["users", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Tutor Name\",\n  \"phone\": \"+1234567891\",\n  \"city\": \"Updated City\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["users", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get User Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/users/stats",
+              "host": ["{{base_url}}"],
+              "path": ["users", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["users", "{{user_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Get Teacher Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/dashboard",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard"]
+            }
+          }
+        },
+        {
+          "name": "Get Analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/dashboard/analytics",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "analytics"]
+            }
+          }
+        },
+        {
+          "name": "Get Batch Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/dashboard/batch/{{batch_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "batch", "{{batch_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Batch Management",
+      "item": [
+        {
+          "name": "Get All Batches",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/batches?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["batches"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Batch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Batch\",\n  \"description\": \"Test batch description\",\n  \"subjectIds\": [],\n  \"maxStudents\": 20,\n  \"schedule\": {\n    \"days\": [\"monday\", \"wednesday\", \"friday\"],\n    \"time\": \"10:00\",\n    \"duration\": 60\n  },\n  \"fees\": {\n    \"amount\": 1000,\n    \"currency\": \"INR\",\n    \"frequency\": \"monthly\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/batches",
+              "host": ["{{base_url}}"],
+              "path": ["batches"]
+            }
+          }
+        },
+        {
+          "name": "Get Batch by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/batches/{{batch_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["batches", "{{batch_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Batch",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Batch Name\",\n  \"description\": \"Updated description\",\n  \"maxStudents\": 25\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/batches/{{batch_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["batches", "{{batch_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Add Students to Batch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentIds\": [\"{{student_id}}\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/batches/{{batch_id}}/students",
+              "host": ["{{base_url}}"],
+              "path": ["batches", "{{batch_id}}", "students"]
+            }
+          }
+        },
+        {
+          "name": "Get Batch Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/batches/{{batch_id}}/dashboard",
+              "host": ["{{base_url}}"],
+              "path": ["batches", "{{batch_id}}", "dashboard"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Student Management",
+      "item": [
+        {
+          "name": "Get All Students",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/students?page=1&limit=10&search=&batchId=",
+              "host": ["{{base_url}}"],
+              "path": ["students"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "search",
+                  "value": ""
+                },
+                {
+                  "key": "batchId",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Student",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Student\",\n  \"email\": \"student@example.com\",\n  \"phone\": \"+1234567890\",\n  \"parentName\": \"Parent Name\",\n  \"parentPhone\": \"+1234567891\",\n  \"dateOfBirth\": \"2010-01-01\",\n  \"address\": \"Student Address\",\n  \"emergencyContact\": \"+1234567892\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/students",
+              "host": ["{{base_url}}"],
+              "path": ["students"]
+            }
+          }
+        },
+        {
+          "name": "Get Student by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/students/{{student_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["students", "{{student_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Student",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Student Name\",\n  \"phone\": \"+1234567893\",\n  \"address\": \"Updated Address\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/students/{{student_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["students", "{{student_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Student Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/students/stats",
+              "host": ["{{base_url}}"],
+              "path": ["students", "stats"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Subject Management",
+      "item": [
+        {
+          "name": "Get All Subjects",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/subjects?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["subjects"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Subject",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mathematics\",\n  \"board\": \"CBSE\",\n  \"classLevel\": \"Class 10\",\n  \"description\": \"Advanced mathematics for class 10\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/subjects",
+              "host": ["{{base_url}}"],
+              "path": ["subjects"]
+            }
+          }
+        },
+        {
+          "name": "Get Subject by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/subjects/{{subject_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["subjects", "{{subject_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Assignment Management",
+      "item": [
+        {
+          "name": "Get All Assignments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/assignments?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["assignments"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Assignment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Test Assignment\",\n  \"description\": \"Test assignment description\",\n  \"batchId\": \"{{batch_id}}\",\n  \"subjectId\": \"{{subject_id}}\",\n  \"dueDate\": \"2024-12-31T23:59:59.000Z\",\n  \"totalMarks\": 100,\n  \"type\": \"homework\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/assignments",
+              "host": ["{{base_url}}"],
+              "path": ["assignments"]
+            }
+          }
+        },
+        {
+          "name": "Get Assignment by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/assignments/{{assignment_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["assignments", "{{assignment_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Upcoming Assignments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/assignments/upcoming",
+              "host": ["{{base_url}}"],
+              "path": ["assignments", "upcoming"]
+            }
+          }
+        },
+        {
+          "name": "Get Assignment Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/assignments/stats/{{batch_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["assignments", "stats", "{{batch_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Note Management",
+      "item": [
+        {
+          "name": "Get All Notes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/notes?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["notes"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Note",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Test Note\",\n  \"description\": \"Test note description\",\n  \"batchId\": \"{{batch_id}}\",\n  \"subjectId\": \"{{subject_id}}\",\n  \"content\": \"Note content here\",\n  \"type\": \"lecture\",\n  \"isPublic\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/notes",
+              "host": ["{{base_url}}"],
+              "path": ["notes"]
+            }
+          }
+        },
+        {
+          "name": "Get Note by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/notes/{{note_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["notes", "{{note_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Search Notes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/notes/search?q=test",
+              "host": ["{{base_url}}"],
+              "path": ["notes", "search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "test"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Performance Management",
+      "item": [
+        {
+          "name": "Get All Performances",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/performances?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["performances"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Performance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"{{student_id}}\",\n  \"batchId\": \"{{batch_id}}\",\n  \"subjectId\": \"{{subject_id}}\",\n  \"assignmentId\": \"{{assignment_id}}\",\n  \"marks\": 85,\n  \"totalMarks\": 100,\n  \"feedback\": \"Good work!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/performances",
+              "host": ["{{base_url}}"],
+              "path": ["performances"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Create Performances",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"performances\": [\n    {\n      \"studentId\": \"{{student_id}}\",\n      \"batchId\": \"{{batch_id}}\",\n      \"subjectId\": \"{{subject_id}}\",\n      \"assignmentId\": \"{{assignment_id}}\",\n      \"marks\": 85,\n      \"totalMarks\": 100,\n      \"feedback\": \"Good work!\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/performances/bulk",
+              "host": ["{{base_url}}"],
+              "path": ["performances", "bulk"]
+            }
+          }
+        },
+        {
+          "name": "Get Performance Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/performances/stats",
+              "host": ["{{base_url}}"],
+              "path": ["performances", "stats"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Submission Management",
+      "item": [
+        {
+          "name": "Get All Submissions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/submissions?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["submissions"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Submission",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"{{student_id}}\",\n  \"assignmentId\": \"{{assignment_id}}\",\n  \"content\": \"Assignment submission content\",\n  \"attachments\": [],\n  \"submittedAt\": \"2024-01-01T10:00:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/submissions",
+              "host": ["{{base_url}}"],
+              "path": ["submissions"]
+            }
+          }
+        },
+        {
+          "name": "Get Submission by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/submissions/{{submission_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["submissions", "{{submission_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Teaching Log",
+      "item": [
+        {
+          "name": "Get All Teaching Logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/teaching-logs?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["teaching-logs"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Teaching Log",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"batchId\": \"{{batch_id}}\",\n  \"subjectId\": \"{{subject_id}}\",\n  \"date\": \"2024-01-01\",\n  \"topicsCovered\": [\"Topic 1\", \"Topic 2\"],\n  \"duration\": 60,\n  \"notes\": \"Teaching session notes\",\n  \"attendance\": [\"{{student_id}}\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/teaching-logs",
+              "host": ["{{base_url}}"],
+              "path": ["teaching-logs"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Fee Management",
+      "item": [
+        {
+          "name": "Get All Fees",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/fees?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["fees"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Fee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"{{student_id}}\",\n  \"batchId\": \"{{batch_id}}\",\n  \"amount\": 1000,\n  \"dueDate\": \"2024-01-31\",\n  \"type\": \"monthly\",\n  \"status\": \"pending\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/fees",
+              "host": ["{{base_url}}"],
+              "path": ["fees"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Topic Management",
+      "item": [
+        {
+          "name": "Get All Topics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/topics?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["topics"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Topic",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Algebra Basics\",\n  \"subjectId\": \"{{subject_id}}\",\n  \"board\": \"CBSE\",\n  \"classLevel\": \"Class 10\",\n  \"chapterNumber\": 1,\n  \"learningObjectives\": [\"Understand basic algebraic concepts\", \"Solve simple equations\"],\n  \"prerequisites\": [\"Basic arithmetic\"],\n  \"estimatedHours\": 4,\n  \"difficultyLevel\": \"medium\",\n  \"bloomTaxonomyLevel\": \"understand\",\n  \"keywords\": [\"algebra\", \"equations\", \"variables\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/topics",
+              "host": ["{{base_url}}"],
+              "path": ["topics"]
+            }
+          }
+        },
+        {
+          "name": "Get Topics by Board and Class",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/topics/board/CBSE/class/Class 10",
+              "host": ["{{base_url}}"],
+              "path": ["topics", "board", "CBSE", "class", "Class 10"]
+            }
+          }
+        },
+        {
+          "name": "Search Topics by Keywords",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/topics/search/keywords?q=algebra",
+              "host": ["{{base_url}}"],
+              "path": ["topics", "search", "keywords"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "algebra"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+
+

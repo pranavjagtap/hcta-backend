@@ -309,11 +309,11 @@ export const getAssignmentSubmissionSummary = async (assignmentId: string, tutor
 
     const submissionDetails = submissions.map(sub => ({
       _id: sub._id.toString(),
-      studentName: (sub.studentId as any).name,
-      studentRollNumber: (sub.studentId as any).rollNumber,
-      submittedAt: sub.submittedAt?.toISOString() || "",
+      studentName: String((sub.studentId as any).name ?? ""),
+      studentRollNumber: (sub.studentId as any).rollNumber ? String((sub.studentId as any).rollNumber) : undefined,
+      submittedAt: sub.submittedAt ? new Date(sub.submittedAt as any).toISOString() : "",
       marksAwarded: sub.marksAwarded,
-      status: sub.status,
+      status: String(sub.status ?? 'submitted'),
       remarks: sub.remarks,
     }));
 

@@ -18,27 +18,27 @@ const router = express.Router();
 router.use(authenticate);
 
 // Create a new batch
-router.post("/", authorize(["teacher", "admin"]), createBatchController);
+router.post("/", authorize(["view_all_batches"]), createBatchController);
 
 // Get all batches for the authenticated tutor
-router.get("/", authorize(["teacher", "admin"]), getTutorBatches);
+router.get("/", authorize(["view_all_batches"]), getTutorBatches);
 
 // Get batch dashboard summary
-router.get("/:id/dashboard", authorize(["teacher", "admin"]), getBatchDashboard);
+router.get("/:id/dashboard", authorize(["view_all_batches"]), getBatchDashboard);
 
 // Get batch by ID
-router.get("/:id", authorize(["teacher", "admin"]), getBatchByIdController);
+router.get("/:id", authorize(["view_all_batches"]), getBatchByIdController);
 
 // Update batch
-router.put("/:id", authorize(["teacher", "admin"]), updateBatchController);
+router.put("/:id", authorize(["view_all_batches"]), updateBatchController);
 
 // Add students to batch
-router.post("/:id/students", authorize(["teacher", "admin"]), addStudentsToBatchController);
+router.post("/:id/students", authorize(["view_all_batches"]), addStudentsToBatchController);
 
 // Remove student from batch
-router.delete("/:id/students/:studentId", authorize(["teacher", "admin"]), removeStudentFromBatchController);
+router.delete("/:id/students/:studentId", authorize(["view_all_batches"]), removeStudentFromBatchController);
 
 // Soft delete batch
-router.delete("/:id", authorize(["teacher", "admin"]), deleteBatch);
+router.delete("/:id", authorize(["view_all_batches"]), deleteBatch);
 
 export default router;

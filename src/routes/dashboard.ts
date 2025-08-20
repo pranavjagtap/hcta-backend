@@ -18,15 +18,15 @@ const router = express.Router();
 router.use(authenticate);
 
 // Dashboard data endpoints
-router.get("/", authorize(["teacher", "admin"]), getTeacherDashboard);
-router.get("/analytics", authorize(["teacher", "admin"]), getAnalytics);
-router.get("/batch/:batchId", authorize(["teacher", "admin"]), getBatchDashboard);
+router.get("/", authorize(["view_reports"]), getTeacherDashboard);
+router.get("/analytics", authorize(["view_reports"]), getAnalytics);
+router.get("/batch/:batchId", authorize(["view_reports"]), getBatchDashboard);
 
 // CRUD endpoints for dashboard caching
-router.post("/", authorize(["teacher", "admin"]), createDashboardData);
-router.get("/:id", authorize(["teacher", "admin"]), getDashboardById);
-router.put("/:id", authorize(["teacher", "admin"]), updateDashboardData);
-router.delete("/:id", authorize(["teacher", "admin"]), deleteDashboard);
-router.get("/list/all", authorize(["teacher", "admin"]), getAllDashboardsData);
+router.post("/", authorize(["view_reports"]), createDashboardData);
+router.get("/:id", authorize(["view_reports"]), getDashboardById);
+router.put("/:id", authorize(["view_reports"]), updateDashboardData);
+router.delete("/:id", authorize(["view_reports"]), deleteDashboard);
+router.get("/list/all", authorize(["view_reports"]), getAllDashboardsData);
 
 export default router;

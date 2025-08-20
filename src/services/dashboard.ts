@@ -8,6 +8,9 @@ import { TeachingLog } from "../models/teachingLog";
 import { Performance } from "../models/performance";
 import { Note } from "../models/note";
 import { Submission } from "../models/submission";
+import { Topic } from "../models/topic";
+import { TopicProgress } from "../models/topicProgress";
+import { Subject } from "../models/subject";
 
 // Create dashboard data
 export const createDashboard = async (data: DashboardBase) => {
@@ -138,26 +141,36 @@ export const generateTeacherDashboardData = async (tutorId: string): Promise<Das
 
   const batchIds = batches.map(batch => batch._id);
   const studentIds = batches.reduce((acc, batch) => {
-    acc.push(...batch.studentIds.map(s => s._id));
+    if (batch.studentIds && Array.isArray(batch.studentIds)) {
+      acc.push(...batch.studentIds.map((s: any) => s._id));
+    }
     return acc;
-  }, []);
+  }, [] as string[]);
+
+  // Get subject IDs for curriculum data
+  const subjectIds = batches.reduce((acc, batch) => {
+    if (batch.subjectIds && Array.isArray(batch.subjectIds)) {
+      acc.push(...batch.subjectIds.map((s: any) => s._id));
+    }
+    return acc;
+  }, [] as string[]);
 
   // Get date ranges
-  const today = new Date();
-  const startOfDay = new Date(today);
+  const currentDate = new Date();
+  const startOfDay = new Date(currentDate);
   startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(today);
+  const endOfDay = new Date(currentDate);
   endOfDay.setHours(23, 59, 59, 999);
 
-  const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - today.getDay());
+  const startOfWeek = new Date(currentDate);
+  startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
   startOfWeek.setHours(0, 0, 0, 0);
   const endOfWeek = new Date(startOfWeek);
   endOfWeek.setDate(startOfWeek.getDate() + 6);
   endOfWeek.setHours(23, 59, 59, 999);
 
-  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+  const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
 
   // Parallel data fetching
   const [
@@ -169,6 +182,8 @@ export const generateTeacherDashboardData = async (tutorId: string): Promise<Das
     recentNotes,
     pendingSubmissions,
     studentPerformanceOverview,
+    curriculumData,
+    topicProgressData,
   ] = await Promise.all([
     TeachingLog.find({
       batchId: { $in: batchIds },
@@ -183,7 +198,7 @@ export const generateTeacherDashboardData = async (tutorId: string): Promise<Das
 
     Assignment.find({
       batchId: { $in: batchIds },
-      dueDate: { $gte: today, $lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
+      dueDate: { $gte: currentDate, $lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
       isDeleted: false,
     })
       .populate([
@@ -230,7 +245,6 @@ export const generateTeacherDashboardData = async (tutorId: string): Promise<Das
       TeachingLog.countDocuments({
         batchId: { $in: batchIds },
         date: { $gte: startOfMonth, $lte: endOfMonth },
-        status: "completed",
         isDeleted: false,
       }),
       Note.countDocuments({
@@ -242,6 +256,7 @@ export const generateTeacherDashboardData = async (tutorId: string): Promise<Das
 
     Note.find({
       batchId: { $in: batchIds },
+      createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
       isDeleted: false,
     })
       .populate([
@@ -251,71 +266,43 @@ export const generateTeacherDashboardData = async (tutorId: string): Promise<Das
       .sort({ createdAt: -1 })
       .limit(5),
 
-    Assignment.aggregate([
-      {
-        $match: {
-          batchId: { $in: batchIds },
-          dueDate: { $lt: today },
-          isDeleted: false,
+    Submission.find({
+      assignmentId: {
+        $in: await Assignment.find({ batchId: { $in: batchIds } }).distinct("_id"),
+      },
+      status: "submitted",
+      isDeleted: false,
+    })
+      .populate([
+        { path: "studentId", select: "name rollNumber" },
+        {
+          path: "assignmentId",
+          select: "topic type",
+          populate: { path: "subjectId", select: "name" },
         },
-      },
-      {
-        $lookup: {
-          from: "submissions",
-          localField: "_id",
-          foreignField: "assignmentId",
-          as: "submissions",
-        },
-      },
-      {
-        $lookup: {
-          from: "batches",
-          localField: "batchId",
-          foreignField: "_id",
-          as: "batch",
-        },
-      },
-      {
-        $unwind: "$batch",
-      },
-      {
-        $project: {
-          topic: 1,
-          type: 1,
-          dueDate: 1,
-          batchName: "$batch.name",
-          totalStudents: { $size: "$batch.studentIds" },
-          submittedCount: { $size: "$submissions" },
-          pendingCount: {
-            $subtract: [{ $size: "$batch.studentIds" }, { $size: "$submissions" }],
-          },
-        },
-      },
-      {
-        $match: {
-          pendingCount: { $gt: 0 },
-        },
-      },
-      {
-        $sort: { dueDate: 1 },
-      },
-      {
-        $limit: 10,
-      },
-    ]),
+      ])
+      .sort({ submittedAt: -1 })
+      .limit(10),
 
     Performance.aggregate([
       {
         $match: {
           studentId: { $in: studentIds },
-          date: { $gte: startOfMonth },
+          date: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
           isDeleted: false,
+        },
+      },
+      {
+        $group: {
+          _id: "$studentId",
+          averageScore: { $avg: { $divide: ["$score", "$maxScore"] } },
+          totalAssessments: { $sum: 1 },
         },
       },
       {
         $lookup: {
           from: "students",
-          localField: "studentId",
+          localField: "_id",
           foreignField: "_id",
           as: "student",
         },
@@ -324,87 +311,216 @@ export const generateTeacherDashboardData = async (tutorId: string): Promise<Das
         $unwind: "$student",
       },
       {
-        $group: {
-          _id: "$student.batchId",
-          averageScore: { $avg: "$score" },
-          totalAssessments: { $sum: 1 },
-          studentsAssessed: { $addToSet: "$studentId" },
-        },
-      },
-      {
-        $lookup: {
-          from: "batches",
-          localField: "_id",
-          foreignField: "_id",
-          as: "batch",
-        },
-      },
-      {
-        $unwind: "$batch",
-      },
-      {
         $project: {
-          batchName: "$batch.name",
-          averageScore: { $round: ["$averageScore", 2] },
+          studentId: "$_id",
+          studentName: "$student.name",
+          averageScore: 1,
           totalAssessments: 1,
-          studentsAssessedCount: { $size: "$studentsAssessed" },
+        },
+      },
+      { $sort: { averageScore: -1 } },
+      { $limit: 5 },
+    ]),
+
+    // Curriculum planning data
+    Promise.all([
+      Topic.countDocuments({
+        subjectId: { $in: subjectIds },
+        isDeleted: false,
+      }),
+      Topic.aggregate([
+        {
+          $match: {
+            subjectId: { $in: subjectIds },
+            isDeleted: false,
+          },
+        },
+        {
+          $group: {
+            _id: "$difficultyLevel",
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+      Topic.aggregate([
+        {
+          $match: {
+            subjectId: { $in: subjectIds },
+            isDeleted: false,
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalHours: { $sum: "$estimatedHours" },
+            averageHours: { $avg: "$estimatedHours" },
+          },
+        },
+      ]),
+    ]),
+
+    // Topic progress data
+    TopicProgress.aggregate([
+      {
+        $match: {
+          batchId: { $in: batchIds },
+          isDeleted: false,
+        },
+      },
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 },
+          averageCompletion: { $avg: "$completionPercentage" },
         },
       },
     ]),
   ]);
 
   const [totalStudents, monthlyAssignments, monthlyTeachingSessions, monthlyNotes] = monthlyStats;
+  const [totalTopics, topicsByDifficulty, topicHours] = curriculumData;
+  const topicProgressBreakdown = topicProgressData;
 
-  const completedSessionsToday = todaySchedule.filter(log => log.status === "completed").length;
-  const pendingSessionsToday = todaySchedule.filter(log => log.status === "pending").length;
+  // Calculate overview statistics
+  const overview = {
+    totalBatches: batches.length,
+    totalStudents,
+    monthlyAssignments,
+    monthlyTeachingSessions,
+    monthlyNotes,
+    totalTopics: totalTopics || 0,
+    totalCurriculumHours: topicHours?.[0]?.totalHours || 0,
+  };
 
-  const weeklySessionsCompleted = weekTeachingLogs.filter(log => log.status === "completed").length;
-  const weeklySessionsTotal = weekTeachingLogs.length;
+  // Calculate today's schedule
+  const today = {
+    totalSessions: todaySchedule.length,
+    completedSessions: todaySchedule.filter(session => session.status === "completed").length,
+    pendingSessions: todaySchedule.filter(session => session.status === "pending").length,
+    schedule: todaySchedule.map(session => ({
+      id: session._id,
+      batchName: (session.batchId as any).name,
+      subjectName: (session.subjectId as any)?.name,
+      topic: session.topic,
+      startTime: session.date,
+      duration: session.durationMinutes,
+      status: session.status,
+    })),
+  };
 
-  const batchSummary = batches.map(batch => ({
-    _id: batch._id,
+  // Calculate this week's statistics
+  const thisWeek = {
+    totalSessions: weekTeachingLogs.length,
+    completedSessions: weekTeachingLogs.filter(session => session.status === "completed").length,
+    completionRate: weekTeachingLogs.length > 0 
+      ? (weekTeachingLogs.filter(session => session.status === "completed").length / weekTeachingLogs.length) * 100 
+      : 0,
+  };
+
+  // Format upcoming assignments
+  const upcoming = {
+    assignments: (() => {
+      const nowTs = Date.now();
+      return upcomingAssignments.map(assignment => ({
+        id: assignment._id,
+        topic: assignment.topic,
+        batchName: (assignment.batchId as any).name,
+        subjectName: (assignment.subjectId as any)?.name,
+        dueDate: assignment.dueDate,
+        type: assignment.type,
+        daysUntilDue: Math.ceil((new Date(assignment.dueDate || nowTs).getTime() - nowTs) / (1000 * 60 * 60 * 24)),
+      }));
+    })(),
+  };
+
+  // Format recent submissions
+  const recent = {
+    submissions: recentSubmissions.map(submission => ({
+      id: submission._id,
+      studentName: (submission.studentId as any).name,
+      assignmentTopic: (submission.assignmentId as any).topic,
+      subjectName: (submission.assignmentId as any).subjectId?.name,
+      submittedAt: submission.submittedAt,
+      status: submission.status,
+    })),
+    notes: recentNotes.map(note => ({
+      id: note._id,
+      topic: note.topic,
+      batchName: (note.batchId as any).name,
+      subjectName: (note.subjectId as any)?.name,
+      createdAt: note.createdAt,
+      noteType: note.noteType,
+    })),
+  };
+
+  // Format pending submissions
+  const pending = {
+    submissions: (() => {
+      const nowTs = Date.now();
+      return pendingSubmissions.map(submission => {
+        const due = (submission.assignmentId as any).dueDate || nowTs;
+        const dueTs = new Date(due).getTime();
+        return {
+          id: submission._id,
+          studentName: (submission.studentId as any).name,
+          assignmentTopic: (submission.assignmentId as any).topic,
+          subjectName: (submission.assignmentId as any).subjectId?.name,
+          dueDate: (submission.assignmentId as any).dueDate,
+          daysOverdue: Math.ceil((nowTs - dueTs) / (1000 * 60 * 60 * 24)),
+        };
+      });
+    })(),
+  };
+
+  // Format student performance overview
+  const performance = {
+    batchOverview: studentPerformanceOverview.map(student => ({
+      studentId: student.studentId,
+      studentName: student.studentName,
+      averageScore: Math.round(student.averageScore * 100),
+      totalAssessments: student.totalAssessments,
+    })),
+  };
+
+  // Format curriculum planning data
+  const curriculum = {
+    totalTopics: totalTopics || 0,
+    topicsByDifficulty: topicsByDifficulty.map(item => ({
+      difficulty: item._id,
+      count: item.count,
+    })),
+    totalHours: topicHours?.[0]?.totalHours || 0,
+    averageHoursPerTopic: topicHours?.[0]?.averageHours || 0,
+  };
+
+  // Format topic progress data
+  const topicProgress = {
+    breakdown: topicProgressBreakdown.map(item => ({
+      status: item._id,
+      count: item.count,
+      averageCompletion: Math.round(item.averageCompletion || 0),
+    })),
+    totalTopics: topicProgressBreakdown.reduce((sum, item) => sum + item.count, 0),
+  };
+
+  // Format batch overview
+  const batchesOverview = batches.map(batch => ({
+    id: batch._id.toString(),
     name: batch.name,
-    academicYear: batch.academicYear,
-    totalStudents: batch.studentIds.length,
-    totalSubjects: batch.subjectIds.length,
-    subjects: batch.subjectIds.map(subject => subject.name),
+    studentCount: (batch.studentIds || []).length,
+    subjectCount: (batch.subjectIds || []).length,
+    academicYear: batch.academicYear || '',
   }));
 
   return {
-    overview: {
-      totalBatches: batches.length,
-      totalStudents,
-      monthlyAssignments,
-      monthlyTeachingSessions,
-      monthlyNotes,
-    },
-    today: {
-      totalSessions: todaySchedule.length,
-      completedSessions: completedSessionsToday,
-      pendingSessions: pendingSessionsToday,
-      schedule: todaySchedule,
-    },
-    thisWeek: {
-      totalSessions: weeklySessionsTotal,
-      completedSessions: weeklySessionsCompleted,
-      completionRate: weeklySessionsTotal > 0 
-        ? Math.round((weeklySessionsCompleted / weeklySessionsTotal) * 100) 
-        : 0,
-    },
-    upcoming: {
-      assignments: upcomingAssignments,
-    },
-    recent: {
-      submissions: recentSubmissions,
-      notes: recentNotes,
-    },
-    pending: {
-      submissions: pendingSubmissions,
-    },
-    performance: {
-      batchOverview: studentPerformanceOverview,
-    },
-    batches: batchSummary,
+    overview,
+    today,
+    thisWeek,
+    upcoming,
+    recent,
+    pending,
+    performance,
+    batches: batchesOverview,
   };
 };
 
@@ -423,7 +539,7 @@ export const generateBatchDashboardData = async (batchId: string, tutorId: strin
     throw new Error("Batch not found or access denied");
   }
 
-  const studentIds = batch.studentIds.map(s => s._id);
+  const studentIds = (batch.studentIds || []).map((s: any) => (s?._id ? s._id : s));
   const today = new Date();
   const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
@@ -516,7 +632,7 @@ export const generateBatchDashboardData = async (batchId: string, tutorId: strin
     studentsAssessed: new Set(studentPerformances.map(p => p.studentId._id.toString())).size,
   };
 
-  const studentPerformanceMap = studentPerformances.reduce((acc, perf) => {
+  const studentPerformanceMap: Record<string, { student: any; performances: any[]; averageScore: number }> = studentPerformances.reduce((acc: Record<string, { student: any; performances: any[]; averageScore: number }>, perf: any) => {
     const studentId = perf.studentId._id.toString();
     if (!acc[studentId]) {
       acc[studentId] = {
@@ -530,21 +646,21 @@ export const generateBatchDashboardData = async (batchId: string, tutorId: strin
   }, {});
 
   Object.values(studentPerformanceMap).forEach((studentData: any) => {
-    const scores = studentData.performances.map(p => p.score || 0);
+    const scores = studentData.performances.map((p: any) => p.score || 0);
     studentData.averageScore = scores.length > 0
-      ? scores.reduce((sum, score) => sum + score, 0) / scores.length
+      ? scores.reduce((sum: number, score: number) => sum + score, 0) / scores.length
       : 0;
   });
 
   return {
     batch: {
-      _id: batch._id,
+      _id: batch._id.toString(),
       name: batch.name,
-      academicYear: batch.academicYear,
-      totalStudents: batch.studentIds.length,
-      totalSubjects: batch.subjectIds.length,
-      subjects: batch.subjectIds,
-      students: batch.studentIds,
+      academicYear: batch.academicYear || '',
+      totalStudents: (batch.studentIds || []).length,
+      totalSubjects: (batch.subjectIds || []).length,
+      subjects: batch.subjectIds || [],
+      students: batch.studentIds || [],
     },
     recent: {
       teachingLogs: recentTeachingLogs,
@@ -555,12 +671,16 @@ export const generateBatchDashboardData = async (batchId: string, tutorId: strin
       assignments: upcomingAssignments,
     },
     performance: {
-      stats: performanceStats,
+      stats: {
+        totalAssessments: performanceStats.totalAssessments,
+        averageScore: performanceStats.averageScore,
+        studentsAssessed: performanceStats.studentsAssessed,
+      },
       studentPerformances: Object.values(studentPerformanceMap),
     },
-    attendance: attendanceStats[0] || {
-      totalSessions: 0,
-      totalDuration: 0,
+    attendance: {
+      totalSessions: (attendanceStats[0] as any)?.totalSessions || 0,
+      totalDuration: (attendanceStats[0] as any)?.totalDuration || 0,
     },
     quickStats: {
       totalTeachingLogs: recentTeachingLogs.length,
@@ -787,3 +907,4 @@ export const generateAnalyticsData = async (
     },
   };
 };
+

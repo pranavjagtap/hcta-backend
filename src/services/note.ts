@@ -379,9 +379,9 @@ export const getBatchNotesSummary = async (batchId: string, tutorId?: string): P
   const recentNotesData = recentNotes.map(note => ({
     _id: note._id.toString(),
     topic: note.topic,
-    noteType: note.noteType,
+    noteType: String(note.noteType ?? ''),
     createdAt: note.createdAt.toISOString(),
-    uploadedByName: (note.uploadedBy as any).name,
+    uploadedByName: String((note.uploadedBy as any)?.name ?? ''),
   }));
 
   return {
@@ -435,14 +435,14 @@ export const searchNotes = async (
   return notes.map(note => ({
     _id: note._id.toString(),
     topic: note.topic,
-    noteType: note.noteType,
-    isPublic: note.isPublic,
-    approved: note.approved,
+    noteType: String(note.noteType ?? ''),
+    isPublic: Boolean(note.isPublic),
+    approved: Boolean(note.approved),
     createdAt: note.createdAt.toISOString(),
-    batchName: (note.batchId as any).name,
-    subjectName: (note.subjectId as any)?.name,
-    uploadedByName: (note.uploadedBy as any).name,
-    fileURL: note.fileURL,
+    batchName: String((note.batchId as any)?.name ?? ''),
+    subjectName: String((note.subjectId as any)?.name ?? ''),
+    uploadedByName: String((note.uploadedBy as any)?.name ?? ''),
+    fileURL: note.fileURL || '',
   }));
 };
 

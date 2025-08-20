@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import { isValidObjectId } from "mongoose";
 import {
   createStudent,
@@ -11,50 +11,51 @@ import {
   getUnassignedStudents,
   getStudentStats,
   checkStudentNameExists,
+  bulkUploadStudents,
 } from "../services/student";
 import {
   createStudentSchema,
   updateStudentSchema,
   studentQuerySchema,
-  addWeaknessSchema,
-  removeWeaknessSchema,
+  bulkUploadSchema,
 } from "../validators/student";
+import { z } from "zod";
+import { AppError } from "../utils/appError";
+import { sendResponse } from "../utils/response";
+import { handleFileUpload } from "../middlewares/fileUpload";
 
 // Create a new student
-export const createStudentController = async (req: Request, res: Response): Promise<void> => {
+export const createStudentController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const parsed = createStudentSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({
-        success: false,
-        error: "Validation failed",
-        details: parsed.error.errors
-      });
-      return;
+    const validatedData = createStudentSchema.parse(req.body);
+    const userId = (req as any).user?._id;
+    const userRole = (req as any).user?.role;
+
+    if (!userId) {
+      throw new AppError("User not authenticated", 401);
     }
 
-    // Check for duplicate student name
-    const nameExists = await checkStudentNameExists(parsed.data.name);
-    if (nameExists) {
-      res.status(400).json({
-        success: false,
-        error: "Student name already exists",
-      });
-      return;
+    // Only admins and teachers can create students
+    if (!["admin", "teacher"].includes(userRole || "")) {
+      throw new AppError("Insufficient permissions", 403);
     }
 
-    const student = await createStudent(parsed.data);
-    res.status(201).json({
-      success: true,
-      data: student,
-      message: "Student created successfully",
-    });
-  } catch (err: any) {
-    res.status(500).json({
-      success: false,
-      error: "Failed to create student",
-      details: err.message || err
-    });
+    const profilePictureFile = req.file;
+    const inputData: any = {
+      ...validatedData,
+      guardianInfo: validatedData.guardianInfo
+        ? {
+            ...validatedData.guardianInfo,
+            email: validatedData.guardianInfo.email || "",
+            address: validatedData.guardianInfo.address || "",
+          }
+        : undefined,
+    };
+    const student = await createStudent(inputData, profilePictureFile);
+
+    sendResponse(res, student, "Student created successfully", 201);
+  } catch (error) {
+    next(error);
   }
 };
 
@@ -90,7 +91,7 @@ export const getTutorStudentsController = async (req: Request, res: Response): P
       filters.classLevel = parsed.data.classLevel;
     }
 
-    const result = await getTutorStudents(req.user._id, filters, {
+    const result = await getTutorStudents((req as any).user._id, filters, {
       page: parsed.data.page,
       limit: parsed.data.limit,
       search: parsed.data.search,
@@ -147,67 +148,44 @@ export const getStudentByIdController = async (req: Request, res: Response): Pro
 };
 
 // Update student
-export const updateStudentController = async (req: Request, res: Response): Promise<void> => {
+export const updateStudentController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
+    const validatedData = updateStudentSchema.parse(req.body);
+    const userId = (req as any).user?._id;
+    const userRole = (req as any).user?.role;
 
-    if (!isValidObjectId(id)) {
-      res.status(400).json({
-        success: false,
-        error: "Invalid student ID",
-      });
-      return;
+    if (!userId) {
+      throw new AppError("User not authenticated", 401);
     }
 
-    const parsed = updateStudentSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({
-        success: false,
-        error: "Validation failed",
-        details: parsed.error.errors
-      });
-      return;
+    // Only admins and teachers can update students
+    if (!["admin", "teacher"].includes(userRole || "")) {
+      throw new AppError("Insufficient permissions", 403);
     }
 
-    // Check if student exists
-    const existingStudent = await getStudentById(id, false);
-    if (!existingStudent) {
-      res.status(404).json({
-        success: false,
-        error: "Student not found",
-      });
-      return;
-    }
+    const profilePictureFile = req.file;
+    const inputData: any = {
+      ...validatedData,
+      guardianInfo: validatedData.guardianInfo
+        ? {
+            ...validatedData.guardianInfo,
+            email: validatedData.guardianInfo.email || "",
+            address: validatedData.guardianInfo.address || "",
+          }
+        : undefined,
+    };
+    const updatedStudent = await updateStudent(id, inputData, profilePictureFile);
 
-    // Check for duplicate student name if name is being updated
-    if (parsed.data.name && parsed.data.name !== existingStudent.name) {
-      const nameExists = await checkStudentNameExists(parsed.data.name, id);
-      if (nameExists) {
-        res.status(400).json({
-          success: false,
-          error: "Student name already exists",
-        });
-        return;
-      }
-    }
-
-    const updatedStudent = await updateStudent(id, parsed.data);
-
-    res.status(200).json({
-      success: true,
-      data: updatedStudent,
-      message: "Student updated successfully",
-    });
-  } catch (err: any) {
-    res.status(500).json({
-      success: false,
-      error: "Failed to update student",
-      details: err.message || err
-    });
+    sendResponse(res, updatedStudent, "Student updated successfully", 200);
+  } catch (error) {
+    next(error);
   }
 };
 
 // Add weakness to student
+const weaknessSchema = z.object({ weakness: z.string().min(1) });
+
 export const addWeaknessController = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
@@ -220,7 +198,7 @@ export const addWeaknessController = async (req: Request, res: Response): Promis
       return;
     }
 
-    const parsed = addWeaknessSchema.safeParse(req.body);
+    const parsed = weaknessSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({
         success: false,
@@ -269,7 +247,7 @@ export const removeWeaknessController = async (req: Request, res: Response): Pro
       return;
     }
 
-    const parsed = removeWeaknessSchema.safeParse(req.body);
+    const parsed = weaknessSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({
         success: false,
@@ -364,7 +342,7 @@ export const getUnassignedStudentsController = async (req: Request, res: Respons
       return;
     }
 
-    const result = await getUnassignedStudents(req.user._id, {
+    const result = await getUnassignedStudents((req as any).user._id, {
       page: parsed.data.page,
       limit: parsed.data.limit,
       search: parsed.data.search,
@@ -385,21 +363,54 @@ export const getUnassignedStudentsController = async (req: Request, res: Respons
 };
 
 // Get student statistics
-export const getStudentStatsController = async (req: Request, res: Response): Promise<void> => {
+export const getStudentStatsController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const stats = await getStudentStats(req.user?._id);
+    const userId = (req as any).user?._id;
+    const userRole = (req as any).user?.role;
 
-    res.status(200).json({
-      success: true,
-      data: stats,
-      message: "Student statistics retrieved successfully",
-    });
-  } catch (err: any) {
-    res.status(500).json({
-      success: false,
-      error: "Failed to retrieve student statistics",
-      details: err.message || err
-    });
+    if (!userId) {
+      throw new AppError("User not authenticated", 401);
+    }
+
+    const stats = await getStudentStats(userId);
+
+    sendResponse(res, stats, "Student statistics retrieved successfully", 200);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Bulk upload students
+export const bulkUploadStudentsController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const validatedData = bulkUploadSchema.parse(req.body);
+    const userId = (req as any).user?._id;
+    const userRole = (req as any).user?.role;
+
+    if (!userId) {
+      throw new AppError("User not authenticated", 401);
+    }
+
+    // Only admins can bulk upload students
+    if (userRole !== "admin") {
+      throw new AppError("Insufficient permissions", 403);
+    }
+
+    const normalizedStudents = validatedData.students.map((s: any) => ({
+      ...s,
+      guardianInfo: s.guardianInfo
+        ? {
+            ...s.guardianInfo,
+            email: s.guardianInfo.email || "",
+            address: s.guardianInfo.address || "",
+          }
+        : undefined,
+    }));
+    const result = await bulkUploadStudents(normalizedStudents as any);
+
+    sendResponse(res, result, "Bulk upload completed", 200);
+  } catch (error) {
+    next(error);
   }
 };
 

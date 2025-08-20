@@ -1,6 +1,17 @@
 // Dashboard Module Interface
 // This file defines the public interface for the Dashboard module
 
+import { Request, Response } from 'express';
+import {
+  DashboardBase,
+  DashboardDocument,
+  DashboardUpdate,
+  DashboardQuery,
+  DashboardData,
+  AnalyticsData,
+  BatchDashboardData,
+} from './types/dashboard';
+
 export interface IDashboardService {
   // Core CRUD operations
   createDashboard(data: DashboardBase): Promise<DashboardDocument>;
@@ -39,16 +50,8 @@ export type {
   DashboardData,
   AnalyticsData,
   BatchDashboardData,
-} from '../types/dashboard';
+} from './types/dashboard';
 
 // Re-export schemas for validation
-export {
-  createDashboardSchema,
-  updateDashboardSchema,
-  dashboardQuerySchema,
-  analyticsQuerySchema,
-  batchDashboardQuerySchema,
-  dashboardDataSchema,
-  batchDashboardDataSchema,
-  analyticsDataSchema,
-} from '../validators/dashboard';
+// Validation schemas live under validators; re-export only if available
+// export { ... } from '../validators/dashboard';

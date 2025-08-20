@@ -2,15 +2,27 @@ import { Document } from "mongoose";
 
 export interface StudentBase {
   name: string;
+  rollNumber: string;
+  classId?: string;
+  batchId?: string;
   parentName?: string;
   parentPhone?: string;
   whatsappNumber?: string;
+  guardianInfo?: {
+    name: string;
+    relationship: string;
+    phone: string;
+    email: string;
+    address: string;
+  };
   schoolName?: string;
   board?: string;
   classLevel?: string;
-  batchId?: string;
+  profilePicture?: {
+    url: string;
+    key: string;
+  };
   weaknesses: string[];
-  rollNumber?: string;
   admissionDate?: Date | string;
 }
 
@@ -22,8 +34,13 @@ export interface StudentDocument extends Document, StudentBase {
   updatedAt: Date;
 }
 
-// Interface for populated student with batch details
-export interface PopulatedStudentDocument extends Omit<StudentDocument, 'batchId'> {
+// Interface for populated student with class and batch details
+export interface PopulatedStudentDocument extends Omit<StudentDocument, 'classId' | 'batchId'> {
+  classId?: {
+    _id: string;
+    name: string;
+    gradeLevel: string;
+  };
   batchId?: {
     _id: string;
     name: string;

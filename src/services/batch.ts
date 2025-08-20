@@ -1,6 +1,6 @@
 import { Batch } from "../models/batch";
 import { Student } from "../models/student";
-import Subject from "../models/subject";
+import { Subject } from "../models/subject";
 import { FilterQuery } from "mongoose";
 import { BatchBase, BatchUpdate, BatchStats, BatchQuery } from "../types/batch";
 

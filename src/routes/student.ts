@@ -9,40 +9,45 @@ import {
   deleteStudent,
   getUnassignedStudentsController,
   getStudentStatsController,
+  bulkUploadStudentsController,
 } from "../controllers/student";
 import { authenticate } from "../middlewares/authenticate";
 import { authorize } from "../middlewares/authorize";
+import { handleFileUpload } from "../middlewares/fileUpload";
 
 const router = express.Router();
 
 // Apply authentication middleware to all routes
 router.use(authenticate);
 
-// Get student statistics
-router.get("/stats", authorize(["teacher", "admin"]), getStudentStatsController);
-
-// Get unassigned students (for batch assignment)
-router.get("/unassigned", authorize(["teacher", "admin"]), getUnassignedStudentsController);
-
 // Create a new student
-router.post("/", authorize(["teacher", "admin"]), createStudentController);
+router.post("/", authorize(["manage_students"]), handleFileUpload("profilePicture"), createStudentController);
+
+// Bulk upload students
+router.post("/bulk-upload", authorize(["manage_students"]), bulkUploadStudentsController);
 
 // Get all students for the authenticated tutor
-router.get("/", authorize(["teacher", "admin"]), getTutorStudentsController);
+router.get("/", authorize(["view_students"]), getTutorStudentsController);
+
+// Get student statistics
+router.get("/stats", authorize(["view_students"]), getStudentStatsController);
+
+// Get unassigned students (for batch assignment)
+router.get("/unassigned", authorize(["view_students"]), getUnassignedStudentsController);
 
 // Get student by ID
-router.get("/:id", authorize(["teacher", "admin"]), getStudentByIdController);
+router.get("/:id", authorize(["view_students"]), getStudentByIdController);
 
 // Update student
-router.put("/:id", authorize(["teacher", "admin"]), updateStudentController);
+router.put("/:id", authorize(["manage_students"]), handleFileUpload("profilePicture"), updateStudentController);
 
 // Add weakness to student
-router.post("/:id/weaknesses", authorize(["teacher", "admin"]), addWeaknessController);
+router.post("/:id/weaknesses", authorize(["manage_students"]), addWeaknessController);
 
 // Remove weakness from student
-router.delete("/:id/weaknesses", authorize(["teacher", "admin"]), removeWeaknessController);
+router.delete("/:id/weaknesses", authorize(["manage_students"]), removeWeaknessController);
 
 // Soft delete student
-router.delete("/:id", authorize(["teacher", "admin"]), deleteStudent);
+router.delete("/:id", authorize(["manage_students"]), deleteStudent);
 
 export default router;
